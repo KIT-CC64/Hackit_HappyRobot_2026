@@ -82,16 +82,18 @@ COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び�
 
 すべて実機で調整しながら値を決めることを想定しています。
 
-## 他パートとのインターフェース（スタブ）
+## 他パートとのインターフェース
 
-| 関数 | 呼び出し先 | 担当 | 未実装時の挙動 |
-|---|---|---|---|
-| `send_serial_command(gomi_type)` | `serial_control.open_lid(servo_num)` | 2年生B | `[STUB]` ログのみ出力して継続 |
-| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`http://localhost:5000`） | 2年生B | 例外を握りつぶし `[STUB]` ログを出力して継続 |
-| `play_voice(gomi_type, streak_count)` | VOICEVOX音声再生 | 1年生A | `[STUB]` ログのみ |
-| `play_retry_voice()` | 「もう一回近づけてケロ」音声 | 1年生A | `[STUB]` ログのみ |
+| 関数 | 呼び出し先 | 担当 | 状態 | 未接続時の挙動 |
+|---|---|---|---|---|
+| `send_serial_command(gomi_type)` | `serial_control.open_lid(servo_num)` | 2年生B | 未実装（スタブ） | `[STUB]` ログのみ出力して継続 |
+| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`http://localhost:5000`） | 2年生B | 未実装（スタブ） | 例外を握りつぶし `[STUB]` ログを出力して継続 |
+| `play_voice(gomi_type, streak_count)` | `voice/voice_control.py`（VOICEVOX音声再生） | 1年生A | **実装済み** | `voice_control.py`が無い/import失敗/VOICEVOX ENGINE未起動の場合は`[STUB]`ログのみで継続 |
+| `play_retry_voice()` | `voice/voice_control.py`（「もう一回近づけてケロ」音声） | 1年生A | **実装済み** | 同上 |
 
-本実装ができたら、これらスタブ関数の中身だけ差し替えれば良い設計です。
+音声まわりは`voice/voice_control.py`が同階層の`voice`フォルダにあれば自動でそちらに委譲される。
+セットアップ手順・カスタマイズ方法は`voice/README.md`を参照。
+残りのスタブ関数も、本実装ができたら中身だけ差し替えれば良い設計です。
 
 ## 要確認・要相談（チームに投げてほしい項目）
 
@@ -104,4 +106,5 @@ COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び�
 ## 既知の制限
 
 - カメラ・モデルの実機依存が強く、パラメータ（距離ゲート・閾値など）は実測しながらの調整が前提
-- Flask/シリアル/音声モジュールが未接続の環境ではスタブ動作となり、実際の分別・演出は行われない
+- Flask/シリアルは未接続の環境ではスタブ動作となる。音声（VOICEVOX）は実装済みだが、
+  VOICEVOX ENGINEが起動していない環境では同様にスタブ動作（ログのみ）になる

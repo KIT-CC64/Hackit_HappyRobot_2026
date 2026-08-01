@@ -15,7 +15,21 @@ try:
     _HAS_SERIAL_MODULE = True
 except ImportError:
     _HAS_SERIAL_MODULE = False
- 
+
+# 1年生A担当：voice/voice_control.py（このファイルの1つ上の階層のvoiceフォルダに置く想定）
+# まだファイルが無い/インポートできない環境でもスタブ動作で動き続けられるようにしておく
+import os
+import sys
+
+_VOICE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "voice")
+if _VOICE_DIR not in sys.path:
+    sys.path.insert(0, _VOICE_DIR)
+try:
+    from voice_control import play_voice as _play_voice_impl, play_retry_voice as _play_retry_voice_impl
+    _HAS_VOICE_MODULE = True
+except ImportError:
+    _HAS_VOICE_MODULE = False
+
 # ============================================================
 # 設定値（実測しながら調整すること）
 # ============================================================
@@ -111,13 +125,26 @@ def post_feed(gomi_type, correct=True):
  
 def play_voice(gomi_type, streak_count):
     """1年生A担当：VOICEVOXでセリフを喋らせる関数。
-    まだ実装が無いのでprintだけのスタブ。
+    voice/voice_control.py が読み込めていればそちらに委譲する。
+    未接続・実行時エラー時は例外を握りつぶしログのみのスタブ動作にフォールバックする。
     """
+    if _HAS_VOICE_MODULE:
+        try:
+            _play_voice_impl(gomi_type, streak_count)
+            return
+        except Exception as e:
+            print(f"[WARN] play_voice実行時エラー、スタブ動作にフォールバック: {e}")
     print(f"[STUB] 音声再生: type={gomi_type}, streak={streak_count}")
- 
- 
+
+
 def play_retry_voice():
-    """1年生A担当：「もう一回近づけてケロ」用のスタブ。"""
+    """1年生A担当：「もう一回近づけてケロ」用。voice_control.pyに委譲、失敗時はスタブ。"""
+    if _HAS_VOICE_MODULE:
+        try:
+            _play_retry_voice_impl()
+            return
+        except Exception as e:
+            print(f"[WARN] play_retry_voice実行時エラー、スタブ動作にフォールバック: {e}")
     print("[STUB] 音声再生: もう一回近づけてケロ")
  
  
