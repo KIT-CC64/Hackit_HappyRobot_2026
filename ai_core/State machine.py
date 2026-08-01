@@ -11,7 +11,9 @@
    → 本実装ができたら、スタブ関数の中身だけ差し替えればよい
  
 【事前準備】
-    pip install pyrealsense2 opencv-python transformers torch pillow numpy pyserial requests
+    pip install pyrealsense2 opencv-python transformers torch pillow numpy requests
+    - 2年生Bの serial_control.py をこのファイルと同じフォルダに置くこと
+      （置かれていない/importできない場合は自動でスタブ動作になり、処理は止まらない）
  
 【使い方】
     python state_machine.py
@@ -22,10 +24,13 @@
       （本番デモでAIが誤判定・無反応のときの保険として用意）
  
 【要確認・要相談（チームに投げてほしい項目）】
-    - シリアル仕様（0-1節）には "1"=petbottle, "2"=can, "0"=全閉 しか
-      定義がなく、"燃えるゴミ用の口を開けるコード" が未定義。
-      3口目があるなら "3" を追加するか、1年生B・2年生Bと仕様を詰めてください。
-      （下のSERVO_CODE_MAPは仮に"3"を割り当てています）
+    - 2年生Bの serial_control.py（open_lid(servo_num: int)）は現状
+      servo_num=1（petbottle）, 2（can）しか定義が無い模様。
+      "燃えるゴミ用の口を開けるservo_num" が未定義なので、
+      1年生B・2年生Bと仕様を詰めてください。
+      （下のSERVO_NUM_MAPは仮に3を割り当てています。インターフェースは
+      「今後変更あるかも」とのことなので、変更されたらこのファイルの
+      SERVO_NUM_MAPとsend_serial_command()だけ直せば追従できます）
 """
  
 import time
@@ -37,6 +42,14 @@ import numpy as np
 import pyrealsense2 as rs
 from transformers import pipeline
 from PIL import Image
+ 
+# 2年生B担当：serial_control.py（同じフォルダに置く想定）
+# まだファイルが無い/インポートできない環境でもスタブ動作で動き続けられるようにしておく
+try:
+    from serial_control import open_lid
+    _HAS_SERIAL_MODULE = True
+except ImportError:
+    _HAS_SERIAL_MODULE = False
  
 # ============================================================
 # 設定値（実測しながら調整すること）
@@ -67,10 +80,10 @@ LABEL_MAP = {
     "trash": "burnable",
 }
  
-SERVO_CODE_MAP = {
-    "petbottle": "1",
-    "can": "2",
-    "burnable": "3",  # ← 要確認（上部の注意書き参照）
+SERVO_NUM_MAP = {
+    "petbottle": 1,
+    "can": 2,
+    "burnable": 3,  # ← 要確認（上部の注意書き参照。2年生Bのopen_lid()にまだ定義が無い可能性）
 }
  
  
@@ -88,33 +101,32 @@ class State(Enum):
  
  
 # ============================================================
-# 他担当インターフェースのスタブ（本実装ができたら中身だけ差し替える）
+# 他担当インターフェースの呼び出し
 # ============================================================
-_serial_conn = None
- 
- 
 def send_serial_command(gomi_type):
-    """2年生B担当：本来は pyserial 経由でArduinoに1文字+改行を送る関数。
-    実機シリアルが繋がっていなければログ出力のみのスタブ動作にフォールバックする。
+    """2年生B担当 serial_control.py の open_lid(servo_num) を呼び出す。
+    serial_control.py がまだ無い/実機が繋がっていない環境でも、
+    ログ出力のみのスタブ動作にフォールバックして処理は止めない。
     """
-    code = SERVO_CODE_MAP.get(gomi_type)
-    if code is None:
-        print(f"[WARN] '{gomi_type}' に対応するシリアルコードが未定義です")
+    servo_num = SERVO_NUM_MAP.get(gomi_type)
+    if servo_num is None:
+        print(f"[WARN] '{gomi_type}' に対応するservo_numが未定義です")
         return
-    global _serial_conn
-    if _serial_conn is None:
+ 
+    if gomi_type == "burnable":
+        # 上部の注意書き参照：2年生Bのopen_lid()にservo_num=3の定義が
+        # まだ無い可能性があるため、実機テスト前に必ず確認すること
+        print("[WARN] burnable用servo_num(=3)は2年生Bと要確認（open_lid仕様に未定義の可能性）")
+ 
+    if _HAS_SERIAL_MODULE:
         try:
-            import serial
-            _serial_conn = serial.Serial("COM3", 9600, timeout=1)  # ポート名は要確認
+            success = open_lid(servo_num)
+            if not success:
+                print(f"[WARN] open_lid({servo_num}) がFalseを返しました")
         except Exception as e:
-            print(f"[STUB] シリアル未接続のためスタブ動作: {e}")
-    if _serial_conn is not None:
-        try:
-            _serial_conn.write(f"{code}\n".encode())
-        except Exception as e:
-            print(f"[WARN] シリアル送信失敗: {e}")
+            print(f"[WARN] open_lid({servo_num}) 呼び出し失敗: {e}")
     else:
-        print(f'[STUB] シリアル送信: "{code}\\n"')
+        print(f"[STUB] serial_control.open_lid({servo_num}) 未接続のためスタブ動作")
  
  
 def post_feed(gomi_type, correct=True):
