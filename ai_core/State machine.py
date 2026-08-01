@@ -247,6 +247,15 @@ def main():
                 post_feed(committed_label, correct=True)
                 play_voice(committed_label, streak_count)
                 print(f"[手動] {committed_label} を強制送信")
+
+            # ---- 手動リトライ（AI判定を打ち切ってRETRYへ強制遷移） ----
+            if key == ord("4") and state not in (State.OPEN, State.THANKS):
+                state = State.RETRY
+                state_entered_at = time.time()
+                buffer.clear()
+                last_center = None
+                play_retry_voice()
+                print("[手動] リトライを強制送信")
  
             # ---- 物体が視界から消えた場合の処理 ----
             if bbox is None:
