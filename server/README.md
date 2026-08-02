@@ -53,6 +53,19 @@ def open_lid(servo_num: int) -> bool:
 #### Step 1: 仮想マシンでの Web API サーバー起動
 仮想マシン環境へ移動し、`server` ディレクトリ内にある `app.py` をコマンドラインから実行します。
 
-```bash
 cd server
-python app.py
+python3 app.py
+
+#### Step 2: センサーブリッジ（`sensor_bridge.py`）の実行
+新しいシェル（ターミナル / コマンドプロンプト）を開き、同様に `server` ディレクトリ内にある `sensor_bridge.py` を実行します。
+
+
+cd server
+python sensor_bridge.py
+
+#### Step 3: Web画面へのアクセス確認
+ブラウザを開き、以下のURLへアクセスします。
+
+
+[http://172.20.125.69:5500/](http://172.20.125.69:5500/)
+これは仮想マシンのIPアドレスなので逐一変更する必要はないです。
