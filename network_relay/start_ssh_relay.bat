@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 echo ================================================
-echo   SSH中継トンネル起動（保険Plan B用）
+echo   SSH中継トンネル起動（保険Plan B用・自動再接続版）
 echo ================================================
 echo.
 echo Plan A（PCとスマホを両方KIT-GUEST3につないで、PCのIPに直接アクセス）が
@@ -13,11 +13,17 @@ echo.
 echo team%TEAMNO%@team%TEAMNO%.hackit へSSH接続し、
 echo このPCのlocalhost:5000(Flask)を仮想マシンのlocalhost:5001へ転送します。
 echo パスワードはチームリーダーの学籍番号です。
-echo このウィンドウは接続を維持するため、デモが終わるまで閉じないでください。
+echo.
+echo 【8/2追加】このウィンドウはSSHが切断されても自動で再接続を試みます。
+echo 完全に終わらせたい時だけ、このウィンドウを閉じるかCtrl+Cを押してください。
 echo ================================================
 echo.
-ssh -N -R 5001:localhost:5000 team%TEAMNO%@team%TEAMNO%.hackit
+
+:RETRY
+echo [%date% %time%] トンネルを開始します（切断されたら自動で再接続します）...
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes -N -R 5001:localhost:5000 team%TEAMNO%@team%TEAMNO%.hackit
 
 echo.
-echo （接続が切れた/終了しました）
-pause
+echo [%date% %time%] 接続が切れました。3秒後に自動で再接続します（やめる場合はこのウィンドウを閉じてください）...
+timeout /t 3 /nobreak >nul
+goto RETRY
