@@ -6,13 +6,18 @@ app = Flask(__name__)
 CORS(app)
 
 # カエルの状態管理（メモリ上に保持）
+# カエルの状態管理（初期値を直接変更）
 state = {
-    "hunger": 0,
-    "level": 1,
-    "exp": 0,
-    "next_exp": 10,  # Lv2に必要な目安
-    "stage": "otamajakushi",
-    "counts": {"petbottle": 0, "can": 0, "burnable": 0},
+    "hunger": 65,  # 初期値を 0 から 65 に変更
+    "level": 2,  # 初期値を 1 から 2 に変更
+    "exp": 12,
+    "next_exp": 20,
+    "stage": "kogaeru",  # 見た目の初期値を変更
+    "counts": {
+        "petbottle": 5,  # テスト用に初期値を設定
+        "can": 3,
+        "burnable": 4,  # 🔥 燃えるゴミの初期値を変更
+    },
 }
 
 
