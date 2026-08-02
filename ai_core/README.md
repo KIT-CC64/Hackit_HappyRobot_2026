@@ -1,170 +1,142 @@
-# 🐸 ケロッと！はらぺこエコガエル（分別強制ゴミ箱）
+# AI判定 - ケロッと！はらぺこエコガエル
 
-## チーム名
+ゴミ分別ロボット「ケロッと！はらぺこエコガエル」のAI判定・ステートマシン統合スクリプト（`State machine.py`）です。
+RealSenseカメラで距離を測ってゴミを検知し、複数フレームの画像分類結果を多数決で確定させたうえで、
+サーボ（フタ開閉）・Flaskサーバー・音声再生の各モジュールを呼び出します。
 
-Happy Robot
+## このスクリプトが解決すること
 
-## プロダクト名
+1. **AI推論のブレを抑える**
+   1フレームごとに「ペットボトル」「缶」…と判定がブレる問題を、複数フレームの多数決（時間方向の平滑化）で安定させてから確定する。
+2. **頭脳部分（タスク4-3）の実装**
+   距離検知 → 画像取得 → AI判定 → 状態遷移、という一連の流れを1つのステートマシンとして実装する。
+3. **他パート未完成でも単体テスト可能にする**
+   シリアル通信（2年生B）／Flask（2年生B）／音声（1年生A）は、まだ相手の実装が無くても動くように
+   スタブ関数にしてある。サーバー担当の完成を待たずにこの1本で単体テストを進められ、
+   本実装ができたらスタブ関数の中身だけ差し替えればよい。
 
-ケロッと！はらぺこエコガエル（分別強制ゴミ箱）
+## 動作環境・事前準備
 
-## 概要
-
-ゴミをかざすと、RealSenseカメラと画像認識AIが種類（ペットボトル／缶／燃えるゴミ）を判別し、
-正解のゴミ箱（カエルの口）だけが物理的にパカッと開いて可愛い声で喋る、分別強制ゴミ箱です。
-人間のモラルに依存していた分別を、「正解の口しか開かない」という物理的な制限と、
-満腹度・レベルが上がっていく「エサやりゲーム」というエンタメ体験によって突破します。
-スマホでQRコードを読み込むと、カエルの成長ステータス（オタマジャクシ→子ガエル→満腹ガエル）
-をその場で見ることもできます。
-
-## デモ
-
-- 発表資料URL：（当日公開）
-- デモURL：（会場での公開URLはQRコードで掲示）
-- デモ動画：（準備中）
-- スクリーンショット：
-
-  ![完成した分別強制ゴミ箱の実機](docs/images/device_photo.jpg)
-
-  カエルの口3つ（青＝ペットボトル／黄＝缶／赤＝燃えるゴミ）と、RealSenseカメラ、
-  「ここの前に持っているごみをかざしてケロ！」の吹き出しを備えた実機。
-
-## システム構成
-
-本番デモは **リーダーのノートPC1台に集約** する構成です。RealSenseカメラ、
-サーボ制御用Arduino、カウント用Arduinoの計3つのUSBデバイスをすべてこのPCに接続し、
-AI推論・Flask・シリアル通信・音声合成もすべて同じPC上で完結させます。
-
-```
-[ノートPC（本番機）]
- - RealSenseカメラ（USB接続）
- - サーボ制御Arduino（USB接続、servo_3.ino）
- - カウント用Arduino（USB接続、GarbageCounter.ino）
- - VOICEVOXアプリ（音声合成エンジン）
- - server/app.py（Flask：API + Webステータス画面配信）
- - server/sensor_bridge.py（カウント用Arduinoの橋渡し、物理センサー通過をカウント確定の正規ルートとする）
- - ai_core/State machine.py（AI推論・頭脳、ステートマシン）
-     ├─ server/serial_control.py 経由でサーボ制御（フタの開閉）
-     ├─ POST http://localhost:5000/api/feed でFlaskへ通知
-     └─ voice/voice_control.py 経由でVOICEVOX（事前キャッシュ済みWAV再生）
-```
-
-スマホからWebステータス画面を見る経路は、会場ネットワークの制約に応じて3段階の
-フォールバックを用意しています（詳細は[`network_relay/README.md`](network_relay/README.md)）。
-
-| プラン | 方式 | 備考 |
-| --- | --- | --- |
-| Plan A | 会場WiFiでPCとスマホを直接接続 | 一番シンプル。クライアント分離があると不可 |
-| Plan B | 配布仮想マシン（`team<番号>.hackit`）経由のSSH中継 | 固定URLでQR作り直し不要。VM側ファイアウォールに依存 |
-| Plan C（本命） | Cloudflare Tunnelで外部公開 | PCからの発信のみで完結、会場ネットワークの制約を受けにくい |
-
-いずれの経路でも、RealSense・Arduino・Flask本体は変更せずノートPC上で動き続けます。
-
-## 背景・課題
-
-ゴミの分別は最終的に「捨てる人のモラル」に依存しており、間違った分別を機械的に防ぐ仕組みは
-一般家庭やイベント会場にはほとんどありません。今回のハッカソンテーマ『突破』に対し、私たちは
-「分別は人の意識に頼るしかない」という当たり前を、正解のゴミ箱しか物理的に開かないという
-制限と、カエルを育てるゲーム性のある体験によって突破することを目指しました。単なる自動選別機
-ではなく、「思わずまた別のゴミも持ってきたくなる」楽しさを重視しています。
-
-## 主な機能
-
-- **AIによるゴミ種別判定**：RealSenseカメラで距離検知した物体を画像認識AIが
-  ペットボトル／缶／燃えるゴミの3種類に判別
-- **正解の口だけが開く物理制限**：判定結果に対応するサーボだけがフタを開閉し、
-  誤った分別を物理的に防止
-- **VOICEVOXによる音声フィードバック**：ゴミの種類・連続投入数に応じてカエルが
-  セリフを喋る（事前キャッシュ方式で本番中のレイテンシを排除）
-- **エサやりゲーム（Webステータス画面）**：満腹度・EXP・レベル（オタマジャクシ→
-  子ガエル→満腹ガエル）・種類別カウントをスマホのQRコードからリアルタイムに確認可能
-- **手動フェイルセーフ**：キーボード入力（`1`/`2`/`3`/`4`）でAI判定を無視して
-  強制的にフタを開ける・リトライさせる保険動作を用意し、デモが止まらない設計
-
-## 工夫した点・こだわった点
-
-- **「絶対に止まらないデモ」への作り込み**：Flask・シリアル通信・音声合成のいずれかが
-  未接続でもスタブ動作にフォールバックし、システム全体が止まらない設計にした。加えて
-  RealSenseのフレーム取得失敗時はパイプラインを自動再起動しつつ、手動フェイルセーフの
-  キー入力だけは復旧待ちの間も受け付け続けるようにしている。
-- **判定の安定化**：1フレームだけで判定するとブレるため、複数フレーム分の判定結果を
-  多数決（コンセンサス方式）で確定させ、物体が動いている間は判定をリセットする
-  ステートマシン（`IDLE→DETECT→JUDGE→OPEN→THANKS→COOLDOWN`、不安定時は`RETRY`）を実装。
-- **音声のレイテンシ対策**：VOICEVOXへその場でリクエストするとCPU競合で音声合成が
-  タイムアウトしやすかったため、本番前にセリフの全パターンを事前合成してWAVキャッシュ
-  として持たせる方式に変更し、本番中のHTTPリクエスト自体を無くした。
-- **ゲーミフィケーションのUI/UX**：カエルの見た目は3段階ともインラインSVGで直接描画し
-  画像ファイル無しで確実に表示、レベルアップ時のジャンプ＋紙吹雪演出やカウント増加時の
-  カードバウンドなど、単なる数値表示で終わらせない演出を加えた。外部CDN・外部フォントに
-  依存しない自己完結ファイルにし、会場ネットが不安定でも表示自体は死なないようにしている。
-- **会場ネットワークの制約への対応**：スマホからのアクセス経路をPlan A→B→Cの3段階で
-  用意し、最終的には「PCから外部への発信のみで完結するCloudflare Tunnel」という、会場の
-  クライアント分離やVM側ファイアウォール設定に依存しない構成に落ち着かせた。
-
-## 使用技術
-
-- フロントエンド：HTML / CSS / JavaScript（インラインSVGアニメーション、外部CDN非依存の自己完結ファイル）
-- バックエンド：Python（Flask、Flask-CORS）
-- AI / API：RealSense SDK（`pyrealsense2`）、画像認識AI（Teachable Machine／Hugging Face
-  Transformersベースモデル）、OpenCV、mediapipe、VOICEVOX ENGINE（音声合成）
-- データベース：なし（デモ用途のためメモリ上の辞書で状態管理）
-- インフラ：Cloudflare Tunnel（`cloudflared`、Web公開）、ハッカソン運営配布の仮想マシン
-  （SSH経由の保険用中継、`tcp_relay.py`）
-- その他：Arduino（C++、サーボ制御・フォトインタラプタによるカウント）、`pyserial`
-  （PC⇔Arduinoシリアル通信）、`qrcode`（QRコード生成）
-
-## 今後の展望
-
-- 画像認識AIを実物のペットボトル・缶・燃えるゴミの写真で本番用に再学習し、判定精度を向上させる
-- 状態（満腹度・レベル・カウント）をメモリ上ではなくDB等に永続化し、複数回のデモやイベント
-  会期をまたいだ運用に対応する
-- ゴミ種別を3種類からさらに増やせるよう、AI判定・サーボ・Flask APIの対応表を拡張する
-- 屋外イベントなどでの利用も見据えた外装の防水・耐久性向上
-- Webステータス画面にランキングやSNSシェア機能を追加し、ゲーミフィケーション性をさらに強化する
-
-## セットアップ方法
+- Intel RealSenseカメラ（距離検知に使用）
+- Python 3.9+ を推奨
 
 ```bash
-git clone <repository-url>
-cd Hackit_HappyRobot_2026
-
-# 必要なライブラリをインストール
-pip install -r requirements.txt
+pip install pyrealsense2 opencv-python transformers torch pillow numpy requests mediapipe pyserial
 ```
 
-事前確認（サーボが動かないトラブルの多くはここが原因です）：
+（リポジトリ直下の`requirements.txt`にまとめてあるので、`pip install -r requirements.txt`でもOK）
 
-- デバイスマネージャーで、サーボ制御Arduino（`servo_3.ino`）とカウント用Arduino
-  （`GarbageCounter.ino`）が実際に何番のCOMポートに割り当てられているか確認し、
-  `server/serial_control.py`・`server/sensor_bridge.py`の`PORT`と一致させる
-- Arduino IDEのシリアルモニタは必ず閉じておく（開いたままだとPythonから接続できない）
+- `mediapipe`はゴミをかざす手/腕を判定対象から除外するために使用（MediaPipe Tasks APIの`HandLandmarker`を利用。未インストールでも動作は止まるが、除外が効かず誤判定が起きやすくなる）
+- 手検出モデルファイル`hand_landmarker.task`を`ai_core`フォルダに配置すること（未配置でも動作は止まるが除外が無効になる）
+  ```bash
+  curl -L -o hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+  ```
 
-起動手順：
+- 2年生B担当の `serial_control.py`（`server/serial_control.py`、`open_lid(servo_num: int) -> bool` を提供）は、
+  リポジトリ構成どおり`server`フォルダに置いてあればOK（このファイルの1つ上の階層の`server`フォルダを
+  自動でパス解決するようにしてある。同じフォルダにコピーする必要はない）
+  - 置かれていない／importできない場合は自動でスタブ動作になり、処理は止まらない
+
+## 使い方
 
 ```bash
-# 1. VOICEVOXアプリを起動しておく
-# 2. 音声キャッシュを事前生成（初回のみ・時間があるときに）
-python voice/voice_control.py --warmup
-
-# 3. まとめて起動（Flask・センサーブリッジ・AI推論を別ウィンドウで起動）
-run_demo.bat
-
-# または個別に手動起動する場合
-cd server && python app.py             # ターミナル1
-cd server && python sensor_bridge.py   # ターミナル2（任意）
-cd ai_core && python "State machine.py"  # ターミナル3
+python "State machine.py"
 ```
 
-スマホからWebステータス画面にアクセスする場合は、`network_relay\start_cloudflare_tunnel.bat`
-を実行して表示される公開URL／QRコードを利用してください（詳細は
-[`network_relay/README.md`](network_relay/README.md)）。
+- ゴミをカメラにかざして数フレーム静止させると、判定が確定してOPEN状態に遷移する
+- `q` キーで終了
+- **手動フェイルセーフ**：`1`=ペットボトル / `2`=缶 / `3`=燃えるゴミ をキー入力すると、
+  AI判定を無視して強制的にOPEN状態へ遷移できる（本番デモでAIが誤判定・無反応のときの保険）
+- **手動リトライ**：`4`キーで強制的にRETRY状態へ遷移できる（「もう一回近づけてケロ」音声を再生してDETECTからやり直す）
 
-## メンバー
+## ステートマシン
 
-| 名前 | 担当 |
-|------|------|
-|      | 全体統合・ボイス・AI推論 |
-|      | デザイン・機構 |
-|      | アルディーノ・機構 |
-|      | Webデザイン |
-|      | 通信・サーバー |
+```
+IDLE ──(物体検知)──▶ DETECT ──(WINDOW_SIZE枚たまる)──▶ JUDGE
+  ▲                     │                                 │
+  │              (物体が離れる)                    多数決が閾値未満
+  │                     │                                 ▼
+  │                     └───────────────────────────── RETRY ──▶ DETECT
+  │
+  │                                        多数決成立 / 手動フェイルセーフ
+  │                                                        ▼
+COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び出し）
+```
+
+| 状態 | 内容 |
+|---|---|
+| `IDLE` | 待機中。距離ゲート内に物体が入るとDETECTへ |
+| `DETECT` | フレームごとに分類し結果をバッファへ蓄積。動きすぎるとバッファをリセット |
+| `JUDGE` | バッファ内の多数決を取り、閾値を満たせばOPENへ。満たさなければRETRYへ |
+| `RETRY` | 判定不能時の一時状態。一定時間後にDETECTへ戻る |
+| `OPEN` | フタを開ける想定時間だけ待機（サーボ制御・Flask送信・音声再生を実行） |
+| `THANKS` | お礼演出の時間だけ待機 |
+| `COOLDOWN` | 物体がカメラから離れるまで待機。離れたらIDLEへ戻る |
+
+## 主要な設定値（`State machine.py` 冒頭）
+
+| 変数名 | 役割 |
+|---|---|
+| `DETECT_MIN_M` / `DETECT_MAX_M` | 距離ゲートの範囲（m）。使用カメラのMin-Zより大きい値にすること |
+| `MIN_CONTOUR_AREA` | 検出領域の最小ピクセル数（ノイズ除去用） |
+| `HAND_EXCLUDE_PAD_PX` | MediaPipe Handsで検出した手の矩形をこの分だけ外側に広げてから判定対象（深度マスク）から除外する |
+| `HAND_LANDMARKER_MODEL_PATH` | `hand_landmarker.task`モデルファイルのパス（既定は`ai_core`フォルダ直下） |
+| `MOVEMENT_THRESHOLD_PX` | これ以上動くと「まだ静止していない」とみなしバッファをリセット |
+| `WINDOW_SIZE` | 多数決に使うフレーム数 |
+| `CONSENSUS_RATIO` | バッファ内で同じラベルが占める割合がこれ以上なら確定 |
+| `CONFIDENCE_THRESHOLD` | 1フレームごとの最低確信度（未満は`unknown`扱い） |
+| `MAX_RETRY` | JUDGE失敗の連続回数の上限（フェイルセーフ検討の目安） |
+| `FAILSAFE_DEFAULT_AFTER_RETRIES` | 例: `"burnable"` にすると規定回数失敗後に自動でその扱いにする（`None`なら無効） |
+| `OPEN_DURATION_SEC` / `THANKS_DURATION_SEC` / `RETRY_MESSAGE_DURATION_SEC` | 各状態の待機時間（実機のタイミングに合わせて調整） |
+| `MODEL_NAME` | 使用する画像分類モデル（`yangy50/garbage-classification`） |
+| `LABEL_MAP` | モデルの出力ラベルを `petbottle` / `can` / `burnable` にマッピング |
+| `SERVO_NUM_MAP` | ゴミ種別とサーボ番号（`open_lid`引数）の対応表 |
+
+すべて実機で調整しながら値を決めることを想定しています。
+
+## 他パートとのインターフェース（統合作業後・最新状態）
+
+| 関数 | 呼び出し先 | 担当 | 状態 | 未接続時の挙動 |
+|---|---|---|---|---|
+| `send_serial_command(gomi_type)` | `server/serial_control.py` の `open_lid(servo_num)` | 2年生B | **実装済み**（統合時に`server`フォルダへのパス解決を追加して疎通するよう修正） | `serial_control.py`が無い/実機Arduino未接続の場合は`[STUB]`ログのみで継続 |
+| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`FLASK_SERVER_URL`、`server/app.py`） | 2年生B | **実装済み** | Flaskサーバー未起動時は例外を握りつぶし`[STUB]`ログを出力して継続 |
+| `play_voice(gomi_type, streak_count)` | `voice/voice_control.py`（VOICEVOX音声再生） | 1年生A | **実装済み** | `voice_control.py`が無い/import失敗/VOICEVOX ENGINE未起動の場合は`[STUB]`ログのみで継続 |
+| `play_retry_voice()` | `voice/voice_control.py`（「もう一回近づけてケロ」音声） | 1年生A | **実装済み** | 同上 |
+
+音声まわりは`voice/voice_control.py`が同階層の`voice`フォルダにあれば自動でそちらに委譲される。
+セットアップ手順・カスタマイズ方法は`voice/README.md`を参照。
+シリアル通信は`server/serial_control.py`へ自動で委譲される。
+
+### 実行構成（最終版：PC1台に集約）
+
+`server/app.py`（Flask）・`server/sensor_bridge.py`・`ai_core/State machine.py`は
+**すべて同じノートPC上**で実行する構成です（ハッカソン運営配布の仮想マシンはUSB越しの
+シリアル通信を受けられないため本番では使用しません）。そのため`post_feed()`の宛先
+`FLASK_SERVER_URL`は`http://localhost:5000`のままでOKです。
+
+本番でこのスクリプトをフル機能で動かすには、事前に以下を起動しておく必要があります：
+
+1. VOICEVOXアプリ（`voice/README.md`参照）
+2. `python server/app.py`（Flask。`server/serial_control.py`のArduino接続はこの時点では
+   未接続でもOK、`open_lid()`呼び出し時に自動で接続を試みる）
+3. `python "ai_core/State machine.py"`（本体）
+
+リポジトリ直下の`run_demo.bat`でこれらをまとめて起動できます。
+
+いずれかが起動していなくても、対応する機能だけスタブ動作にフォールバックしてデモは止まりません。
+詳細な構成図・起動手順は`server/README.md`を参照してください。
+
+## 要確認・要相談（チームに投げてほしい項目）
+
+- `SERVO_NUM_MAP`は`petbottle=1, can=2, burnable=3`。`arduino/servo_3/servo_3.ino`は3口分（servoNum 1〜3）に
+  対応済みで、`server/serial_control.py`の`open_lid()`もservo_numを検証せずそのまま送信するため、
+  経路上はburnable(=3)も含めて疎通する構成になっています。ただし実機での開閉動作は必ず一度実測して確認してください。
+- ゴミのカウント確定は現状「AIが判定確定した瞬間」（`post_feed`）が正規ルートです。
+  投入口のフォトインタラプタ（`server/sensor_bridge.py`）による物理検知は、二重カウントを避けるため
+  デフォルトでFlaskへの送信を無効化しています。方針を変える場合は`server/README.md`の該当セクションを参照。
+
+## 既知の制限
+
+- カメラ・モデルの実機依存が強く、パラメータ（距離ゲート・閾値など）は実測しながらの調整が前提
+- Flask/シリアルは、それぞれのサーバー・Arduinoが未接続の環境ではスタブ動作となる。音声（VOICEVOX）も同様に、
+  VOICEVOX ENGINEが起動していない環境ではスタブ動作（ログのみ）になる
