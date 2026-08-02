@@ -27,3 +27,7 @@ pyserial
 
 # --- 共通（Flask連携・VOICEVOX連携で使用） ---
 requests
+
+# --- network_relay/start_cloudflare_tunnel.py（Plan C・Web公開の保険、任意） ---
+# 無くても動く（QRコード表示だけ省略される）が、入れておくと公開URLをその場でQR化できる。
+qrcode

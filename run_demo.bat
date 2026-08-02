@@ -37,8 +37,11 @@ echo.
 echo ================================================
 echo 起動処理を開始しました。
 echo.
-echo スマホ用URL（QRコード用）: http://＜このPCのIPアドレス＞:5000/
-echo IPアドレスの確認方法: 別のコマンドプロンプトで ipconfig を実行し、
-echo モバイルホットスポット用アダプターの IPv4 アドレスを確認してください。
+echo スマホからのアクセス方法（8/2時点、Plan Cを本命に変更）:
+echo   [本命] network_relay\start_cloudflare_tunnel.bat を実行し、
+echo          表示される公開URL/QRコードでアクセス（会場WiFi非依存）
+echo   [予備] 同一WiFiで繋がる場合のみ http://＜このPCのIPアドレス＞:5000/
+echo          （IPアドレスは別窓で ipconfig を実行して確認）
+echo 詳細は network_relay\README.md を参照。
 echo ================================================
 pause
