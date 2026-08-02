@@ -1,4 +1,13 @@
 import os
+
+# 【8/2追加】会場WiFiからHugging Face Hub(huggingface.co)へ到達できない/不安定な場合、
+# transformersのpipeline()がモデル更新確認のHEADリクエストで毎回タイムアウト→リトライを
+# 繰り返し、その間RealSenseの初期化にすら進めなくなる（"カメラが立ち上がらない"ように見える）。
+# モデルは既に一度ダウンロード済みでローカルキャッシュにあるはずなので、完全オフラインモードにして
+# 起動時のネットワーク依存を無くす（本番当日の会場ネットワークが不安定でも影響を受けないようにする）。
+os.environ.setdefault("HF_HUB_OFFLINE", "1")
+os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
 import sys
 import time
 from collections import deque, Counter
@@ -350,9 +359,44 @@ def main():
     last_timestamp_ms = -1
     print("起動完了。'q'で終了 / '1','2','3'で手動フェイルセーフ")
  
+    consecutive_frame_errors = 0
+
     try:
         while True:
-            frames = rs_pipeline.wait_for_frames()
+            # 【8/2追加】RealSenseがUSB接続の瞬断・帯域不足等で
+            # "Frame didn't arrive within 5000"のRuntimeErrorを出すことがある。
+            # 以前はここで例外が握りつぶされずクラッシュし、デモ中にAI判定が
+            # 完全に止まってしまっていた。パイプラインを再起動して復旧を試み、
+            # 復旧できない間もキー入力（手動フェイルセーフ）は受け付け続ける。
+            try:
+                frames = rs_pipeline.wait_for_frames()
+            except RuntimeError as e:
+                consecutive_frame_errors += 1
+                print(f"[WARN] RealSenseフレーム取得失敗（{consecutive_frame_errors}回目）: {e}")
+                print("[WARN] パイプラインの再起動を試みます...")
+                try:
+                    rs_pipeline.stop()
+                except Exception:
+                    pass
+                time.sleep(1.0)
+                try:
+                    profile = rs_pipeline.start(config)
+                    depth_scale = profile.get_device().first_depth_sensor().get_depth_scale()
+                    print("[WARN] パイプライン再起動に成功しました。")
+                    consecutive_frame_errors = 0
+                except Exception as e2:
+                    print(f"[WARN] パイプライン再起動に失敗: {e2}")
+                    print("[WARN] USBケーブル・接続ポート（ハブ経由でなく直挿し推奨）を確認してください。")
+                # カメラ復旧待ちの間も 'q' 終了 / '1','2','3' 手動フェイルセーフのキー入力だけは
+                # 受け付ける（ウィンドウが一度も作られていない最初の1回はキーが拾えないことがある）
+                try:
+                    key = cv2.waitKey(1) & 0xFF
+                    if key == ord("q"):
+                        break
+                except Exception:
+                    pass
+                continue
+
             aligned = align.process(frames)
             depth_frame = aligned.get_depth_frame()
             color_frame = aligned.get_color_frame()
