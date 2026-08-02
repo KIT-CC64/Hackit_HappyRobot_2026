@@ -249,20 +249,26 @@ h2{
 
     height:100%;
 
+    overflow:hidden;
+
+    white-space:nowrap;
+
     display:flex;
 
     justify-content:center;
 
     align-items:center;
 
-    font-size:20px;
+    font-size:16px;
 
     font-weight:bold;
 
     transition:0.5s;
 
 }
-
+.stack span{
+    margin-left:5px;
+}
 
 .pet{
 
@@ -704,13 +710,49 @@ let canHunger = Math.min(data.counts.can * 10, 100);
 let burnableHunger = Math.min(data.counts.burnable * 10, 100);
 let petHunger = Math.min(data.counts.petbottle * 10, 100);
 
+// ホーム表示用の割合計算
+let total =
+    data.counts.can +
+    data.counts.burnable +
+    data.counts.petbottle;
+
+
+// 0個の場合
+if(total == 0){
+    total = 1;
+}
+
+
+// 100%中の割合
+let canPercent =
+    Math.round((data.counts.can / total) * 100);
+
+
+let burnPercent =
+    Math.round((data.counts.burnable / total) * 100);
+
+
+let petPercent =
+    100 - canPercent - burnPercent;
+
+
+
+// 数字表示
+document.getElementById("homeCanText").innerHTML =
+canPercent + "%";
+
+document.getElementById("homeBurnText").innerHTML =
+burnPercent + "%";
+
+document.getElementById("homePetText").innerHTML =
+petPercent + "%";
+
+// ホーム横棒の幅変更
 document.getElementById("homeCanGauge").style.width =
 canPercent + "%";
 
-
 document.getElementById("homeBurnGauge").style.width =
 burnPercent + "%";
-
 
 document.getElementById("homePetGauge").style.width =
 petPercent + "%";
@@ -723,27 +765,7 @@ let homeHunger = Math.min(
     100
 );
 
-// ホーム3種類表示
 
-setGauge(
-    "homeCanGauge",
-    canHunger,
-    "#FFD600"
-);
-
-
-setGauge(
-    "homeBurnGauge",
-    burnableHunger,
-    "#F44336"
-);
-
-
-setGauge(
-    "homePetGauge",
-    petHunger,
-    "#29B6F6"
-);
 
 // 缶（黄色）
 document.getElementById("canHunger").innerHTML = canHunger;
