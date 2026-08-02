@@ -12,7 +12,7 @@ set /p TEAMNO="チーム番号を入力してください（例: 1）: "
 echo.
 echo team%TEAMNO%@team%TEAMNO%.hackit へSSH接続し、
 echo このPCのlocalhost:5000(Flask)を仮想マシンのlocalhost:5001へ転送します。
-echo パスワードはチームリーダーの学籍番号です。
+echo パスワードは別途共有された合言葉を入力してください（学籍番号などの個人情報はここに書かない）。
 echo.
 echo 【8/2追加】このウィンドウはSSHが切断されても自動で再接続を試みます。
 echo 完全に終わらせたい時だけ、このウィンドウを閉じるかCtrl+Cを押してください。

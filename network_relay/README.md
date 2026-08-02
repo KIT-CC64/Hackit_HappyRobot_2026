@@ -55,7 +55,7 @@ PC側のFlask・シリアル通信・AI推論は今までどおりノートPC上
 
 ```bash
 ssh team<番号>@team<番号>.hackit
-# パスワード：チームリーダーの学籍番号
+# パスワード：（別途共有された合言葉。学籍番号などの個人情報はここに書かない）
 
 # このリポジトリのnetwork_relayフォルダを仮想マシンにも置いておく（git cloneでもscpでもOK）
 python3 tcp_relay.py --listen-port 5000 --forward-port 5001
@@ -75,7 +75,7 @@ network_relay\start_ssh_relay.bat
 ssh -N -R 5001:localhost:5000 team<番号>@team<番号>.hackit
 ```
 
-パスワード入力を求められたら、チームリーダーの学籍番号を入力。このウィンドウも
+パスワード入力を求められたら、別途共有された合言葉を入力。このウィンドウも
 デモが終わるまで開いたままにする。
 
 **3. スマホから確認**
