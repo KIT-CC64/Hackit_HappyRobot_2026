@@ -1,8 +1,7 @@
 # ケロッと！はらぺこエコガエル - Python依存パッケージ一括インストール用
 #
-# 【構成メモ】ホストPC（RealSense・サーボ用Arduino接続）と仮想マシン
-# （Flask・カウント用Arduino接続、2年生B担当）でそれぞれ必要なパッケージが異なります。
-# 全部まとめてインストールしても害はありませんが、時間が無い場合は該当セクションだけでOKです。
+# 本番はこのPC1台に集約する構成なので、以下を全部同じPC（同じPython環境）に
+# インストールすればOKです。
 #
 # 使い方：
 #   pip install -r requirements.txt
@@ -10,9 +9,7 @@
 # torch はサイズが大きいので、時間が無い場合はCPU版で十分です
 # （画像分類モデルの推論だけなのでGPUは必須ではありません）。
 
-# ============================================================
-# ホストPC用（ai_core/State machine.py, server/serial_control.py）
-# ============================================================
+# --- ai_core/State machine.py（RealSense + AI推論） ---
 pyrealsense2
 opencv-python
 transformers
@@ -20,13 +17,13 @@ torch
 pillow
 numpy
 mediapipe
-pyserial
-requests
 
-# ============================================================
-# 仮想マシン用（server/app.py, server/sensor_bridge.py）
-# ============================================================
+# --- server/app.py（Flask APIサーバー + Web画面配信） ---
 flask
 flask-cors
+
+# --- server/serial_control.py / server/sensor_bridge.py（シリアル通信） ---
 pyserial
+
+# --- 共通（Flask連携・VOICEVOX連携で使用） ---
 requests

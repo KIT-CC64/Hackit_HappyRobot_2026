@@ -99,28 +99,29 @@ COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び�
 | 関数 | 呼び出し先 | 担当 | 状態 | 未接続時の挙動 |
 |---|---|---|---|---|
 | `send_serial_command(gomi_type)` | `server/serial_control.py` の `open_lid(servo_num)` | 2年生B | **実装済み**（統合時に`server`フォルダへのパス解決を追加して疎通するよう修正） | `serial_control.py`が無い/実機Arduino未接続の場合は`[STUB]`ログのみで継続 |
-| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`FLASK_SERVER_URL`、`server/app.py`） | 2年生B | **実装済み** | Flaskサーバー未起動/未到達時は例外を握りつぶし`[STUB]`ログを出力して継続 |
+| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`FLASK_SERVER_URL`、`server/app.py`） | 2年生B | **実装済み** | Flaskサーバー未起動時は例外を握りつぶし`[STUB]`ログを出力して継続 |
 | `play_voice(gomi_type, streak_count)` | `voice/voice_control.py`（VOICEVOX音声再生） | 1年生A | **実装済み** | `voice_control.py`が無い/import失敗/VOICEVOX ENGINE未起動の場合は`[STUB]`ログのみで継続 |
 | `play_retry_voice()` | `voice/voice_control.py`（「もう一回近づけてケロ」音声） | 1年生A | **実装済み** | 同上 |
 
 音声まわりは`voice/voice_control.py`が同階層の`voice`フォルダにあれば自動でそちらに委譲される。
 セットアップ手順・カスタマイズ方法は`voice/README.md`を参照。
-シリアル通信は`server/serial_control.py`へ自動で委譲される（このスクリプトと同じホストPC上で実行する想定）。
+シリアル通信は`server/serial_control.py`へ自動で委譲される。
 
-### 【重要】Flaskは別マシン（仮想マシン）上で動く構成になった
+### 実行構成（最終版：PC1台に集約）
 
-`server/app.py`（Flask）と`server/sensor_bridge.py`は、2年生Bの**仮想マシン**上で動かす運用に
-変更されています。このスクリプト（`State machine.py`）はRealSenseカメラが必要なため、
-引き続き**ホストPC（本番ノートPC）上**で実行します。そのため`post_feed()`は`localhost`ではなく
-冒頭の`FLASK_SERVER_URL`（仮想マシンのIPアドレス）宛てに送信するようになっています。
-**本番前に仮想マシンの最新IPアドレスと`FLASK_SERVER_URL`の値が一致しているか必ず確認してください。**
+`server/app.py`（Flask）・`server/sensor_bridge.py`・`ai_core/State machine.py`は
+**すべて同じノートPC上**で実行する構成です（ハッカソン運営配布の仮想マシンはUSB越しの
+シリアル通信を受けられないため本番では使用しません）。そのため`post_feed()`の宛先
+`FLASK_SERVER_URL`は`http://localhost:5000`のままでOKです。
 
 本番でこのスクリプトをフル機能で動かすには、事前に以下を起動しておく必要があります：
 
-1. VOICEVOXアプリ（ホストPC側、`voice/README.md`参照）
-2. 仮想マシン側で `python server/app.py`（Flask）と `python server/sensor_bridge.py`
-3. ホストPC側で `python "ai_core/State machine.py"`（本体。`server/serial_control.py`の
-   Arduino接続はこの時点では未接続でもOK、`open_lid()`呼び出し時に自動で接続を試みる）
+1. VOICEVOXアプリ（`voice/README.md`参照）
+2. `python server/app.py`（Flask。`server/serial_control.py`のArduino接続はこの時点では
+   未接続でもOK、`open_lid()`呼び出し時に自動で接続を試みる）
+3. `python "ai_core/State machine.py"`（本体）
+
+リポジトリ直下の`run_demo.bat`でこれらをまとめて起動できます。
 
 いずれかが起動していなくても、対応する機能だけスタブ動作にフォールバックしてデモは止まりません。
 詳細な構成図・起動手順は`server/README.md`を参照してください。

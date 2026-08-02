@@ -107,12 +107,12 @@ class State(Enum):
 # ============================================================
 # ネットワーク設定
 # ============================================================
-# 【構成メモ】このState machine.py はRealSenseカメラが挿さっているノートPC（ホスト）上で
-# 直接実行する想定。一方 server/app.py（Flask）は2年生Bの仮想マシン上で動かす運用になった
-# ため、"localhost" では届かない。仮想マシンのIPアドレスに向けて送信する。
-# 【要確認】このIPは環境によって変わる可能性がある。本番前に2年生Bに最新のIPを確認し、
-# 必要ならここを書き換えること。
-FLASK_SERVER_URL = "http://172.20.125.69:5000"
+# 【構成メモ（最終版）】本番デモはリーダーのノートPC1台に集約する運用に変更。
+# RealSenseカメラ・サーボ制御Arduino・カウント用Arduinoの2台とも、すべてこのPCに
+# USB接続する。server/app.py（Flask）も同じPC上で起動するため、localhostでOK。
+# （ハッカソン運営から配布された仮想マシン(team番号.hackit、SSH接続のUbuntu)は
+#   USB越しのシリアル通信ができないため、本番構成としては使用しない）
+FLASK_SERVER_URL = "http://localhost:5000"
 
 
 # ============================================================
@@ -146,8 +146,7 @@ def send_serial_command(gomi_type):
  
 def post_feed(gomi_type, correct=True):
     """2年生B担当：Flaskの POST /api/feed を呼ぶ関数。
-    サーバー（仮想マシン上のserver/app.py）が未起動・未到達でも例外を握りつぶして
-    スタブとして継続する。
+    サーバー（同じPC上のserver/app.py）が未起動でも例外を握りつぶしてスタブとして継続する。
     """
     try:
         import requests
@@ -157,7 +156,7 @@ def post_feed(gomi_type, correct=True):
             timeout=0.5,
         )
     except Exception as e:
-        print(f"[STUB] Flask送信スキップ（サーバー未起動/仮想マシン未到達の可能性）: {e}")
+        print(f"[STUB] Flask送信スキップ（サーバー未起動の可能性）: {e}")
  
  
 def play_voice(gomi_type, streak_count):
@@ -379,7 +378,9 @@ def main():
                 state_entered_at = time.time()
                 streak_count += 1
                 send_serial_command(committed_label)
-                post_feed(committed_label, correct=True)
+                # 【方針確定・8/2】カウント確定の正規ルートはserver/sensor_bridge.py側
+                # （カウント用Arduinoの物理検知）に統一。二重カウント防止のためコメントアウト。
+                #post_feed(committed_label, correct=True)
                 play_voice(committed_label, streak_count)
                 print(f"[手動] {committed_label} を強制送信")
 
@@ -435,7 +436,8 @@ def main():
                     state = State.OPEN
                     state_entered_at = time.time()
                     send_serial_command(committed_label)
-                    post_feed(committed_label, correct=True)
+                    # 【方針確定・8/2】カウントはserver/sensor_bridge.py側（物理センサー）が正規ルート。
+                    #post_feed(committed_label, correct=True)
                     play_voice(committed_label, streak_count)
                     print(f"[確定] {committed_label} (一致率{ratio:.0%}, 平均確信度{avg_score:.2f})")
                 else:
@@ -447,7 +449,8 @@ def main():
                         state_entered_at = time.time()
                         streak_count += 1
                         send_serial_command(committed_label)
-                        post_feed(committed_label, correct=True)
+                        # 【方針確定・8/2】カウントはserver/sensor_bridge.py側（物理センサー）が正規ルート。
+                        #post_feed(committed_label, correct=True)
                         play_voice(committed_label, streak_count)
                         print(f"[フェイルセーフ] {committed_label} に自動確定")
                     else:
