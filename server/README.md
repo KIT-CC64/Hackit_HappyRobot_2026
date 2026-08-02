@@ -35,6 +35,7 @@ def open_lid(servo_num: int) -> bool:
     :param servo_num: 1（口1: ペットボトル用）または 2（口2: 缶用）
     :return: 送信成功時 True
     """
+```
 
 ## 🚀 実行・セットアップ手順
 
