@@ -345,13 +345,29 @@ h2 img{
 </span>
 
 </div>
+<div class="home-status">
+
+<div>
+🥫 缶
 <div class="gauge">
-    <div id="homeGauge" class="gauge-inner"></div>
+<div id="homeCanGauge" class="gauge-inner"></div>
+</div>
 </div>
 
-<div class="status-text">
-満腹度：
-<span id="homeHunger">0</span>%
+<div>
+🔥 燃えるゴミ
+<div class="gauge">
+<div id="homeBurnGauge" class="gauge-inner"></div>
+</div>
+</div>
+
+<div>
+🧴 ペットボトル
+<div class="gauge">
+<div id="homePetGauge" class="gauge-inner"></div>
+</div>
+</div>
+
 </div>
 
 </div>
@@ -640,21 +656,27 @@ let homeHunger = Math.min(
     100
 );
 
-// ホーム（緑）
-let homeColor = "#F44336";
+// ホーム3種類表示
 
-if(homeHunger >= 75){
-    homeColor = "#4CAF50";
-}
-else if(homeHunger >= 50){
-    homeColor = "#8BC34A";
-}
-else if(homeHunger >= 25){
-    homeColor = "#FFC107";
-}
+setGauge(
+    "homeCanGauge",
+    canHunger,
+    "#FFD600"
+);
 
-document.getElementById("homeHunger").innerHTML = homeHunger;
-setGauge("homeGauge", homeHunger, homeColor);
+
+setGauge(
+    "homeBurnGauge",
+    burnableHunger,
+    "#F44336"
+);
+
+
+setGauge(
+    "homePetGauge",
+    petHunger,
+    "#29B6F6"
+);
 
 // 缶（黄色）
 document.getElementById("canHunger").innerHTML = canHunger;
