@@ -21,8 +21,10 @@ RealSenseカメラで距離を測ってゴミを検知し、複数フレーム�
 - Python 3.9+ を推奨
 
 ```bash
-pip install pyrealsense2 opencv-python transformers torch pillow numpy requests mediapipe
+pip install pyrealsense2 opencv-python transformers torch pillow numpy requests mediapipe pyserial
 ```
+
+（リポジトリ直下の`requirements.txt`にまとめてあるので、`pip install -r requirements.txt`でもOK）
 
 - `mediapipe`はゴミをかざす手/腕を判定対象から除外するために使用（MediaPipe Tasks APIの`HandLandmarker`を利用。未インストールでも動作は止まるが、除外が効かず誤判定が起きやすくなる）
 - 手検出モデルファイル`hand_landmarker.task`を`ai_core`フォルダに配置すること（未配置でも動作は止まるが除外が無効になる）
@@ -30,8 +32,9 @@ pip install pyrealsense2 opencv-python transformers torch pillow numpy requests 
   curl -L -o hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
   ```
 
-- 2年生B担当の `serial_control.py` を `State machine.py` と同じフォルダに置くこと
-  （`open_lid(servo_num: int) -> bool` を提供する想定）
+- 2年生B担当の `serial_control.py`（`server/serial_control.py`、`open_lid(servo_num: int) -> bool` を提供）は、
+  リポジトリ構成どおり`server`フォルダに置いてあればOK（このファイルの1つ上の階層の`server`フォルダを
+  自動でパス解決するようにしてある。同じフォルダにコピーする必要はない）
   - 置かれていない／importできない場合は自動でスタブ動作になり、処理は止まらない
 
 ## 使い方
@@ -91,29 +94,48 @@ COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び�
 
 すべて実機で調整しながら値を決めることを想定しています。
 
-## 他パートとのインターフェース
+## 他パートとのインターフェース（統合作業後・最新状態）
 
 | 関数 | 呼び出し先 | 担当 | 状態 | 未接続時の挙動 |
 |---|---|---|---|---|
-| `send_serial_command(gomi_type)` | `serial_control.open_lid(servo_num)` | 2年生B | 未実装（スタブ） | `[STUB]` ログのみ出力して継続 |
-| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`http://localhost:5000`） | 2年生B | 未実装（スタブ） | 例外を握りつぶし `[STUB]` ログを出力して継続 |
+| `send_serial_command(gomi_type)` | `server/serial_control.py` の `open_lid(servo_num)` | 2年生B | **実装済み**（統合時に`server`フォルダへのパス解決を追加して疎通するよう修正） | `serial_control.py`が無い/実機Arduino未接続の場合は`[STUB]`ログのみで継続 |
+| `post_feed(gomi_type, correct)` | Flask `POST /api/feed`（`FLASK_SERVER_URL`、`server/app.py`） | 2年生B | **実装済み** | Flaskサーバー未起動/未到達時は例外を握りつぶし`[STUB]`ログを出力して継続 |
 | `play_voice(gomi_type, streak_count)` | `voice/voice_control.py`（VOICEVOX音声再生） | 1年生A | **実装済み** | `voice_control.py`が無い/import失敗/VOICEVOX ENGINE未起動の場合は`[STUB]`ログのみで継続 |
 | `play_retry_voice()` | `voice/voice_control.py`（「もう一回近づけてケロ」音声） | 1年生A | **実装済み** | 同上 |
 
 音声まわりは`voice/voice_control.py`が同階層の`voice`フォルダにあれば自動でそちらに委譲される。
 セットアップ手順・カスタマイズ方法は`voice/README.md`を参照。
-残りのスタブ関数も、本実装ができたら中身だけ差し替えれば良い設計です。
+シリアル通信は`server/serial_control.py`へ自動で委譲される（このスクリプトと同じホストPC上で実行する想定）。
+
+### 【重要】Flaskは別マシン（仮想マシン）上で動く構成になった
+
+`server/app.py`（Flask）と`server/sensor_bridge.py`は、2年生Bの**仮想マシン**上で動かす運用に
+変更されています。このスクリプト（`State machine.py`）はRealSenseカメラが必要なため、
+引き続き**ホストPC（本番ノートPC）上**で実行します。そのため`post_feed()`は`localhost`ではなく
+冒頭の`FLASK_SERVER_URL`（仮想マシンのIPアドレス）宛てに送信するようになっています。
+**本番前に仮想マシンの最新IPアドレスと`FLASK_SERVER_URL`の値が一致しているか必ず確認してください。**
+
+本番でこのスクリプトをフル機能で動かすには、事前に以下を起動しておく必要があります：
+
+1. VOICEVOXアプリ（ホストPC側、`voice/README.md`参照）
+2. 仮想マシン側で `python server/app.py`（Flask）と `python server/sensor_bridge.py`
+3. ホストPC側で `python "ai_core/State machine.py"`（本体。`server/serial_control.py`の
+   Arduino接続はこの時点では未接続でもOK、`open_lid()`呼び出し時に自動で接続を試みる）
+
+いずれかが起動していなくても、対応する機能だけスタブ動作にフォールバックしてデモは止まりません。
+詳細な構成図・起動手順は`server/README.md`を参照してください。
 
 ## 要確認・要相談（チームに投げてほしい項目）
 
-- 2年生Bの `serial_control.py`（`open_lid(servo_num: int)`）は現状 `servo_num=1`（petbottle）,
-  `2`（can）しか定義が無い模様。「燃えるゴミ用の口を開けるservo_num」が未定義なので、
-  1年生B・2年生Bと仕様を詰めてください。
-  `SERVO_NUM_MAP`では仮に`3`を割り当てています。インターフェースは今後変更あるかもとのことなので、
-  変更されたら`SERVO_NUM_MAP`と`send_serial_command()`だけ直せば追従できます。
+- `SERVO_NUM_MAP`は`petbottle=1, can=2, burnable=3`。`arduino/servo_3/servo_3.ino`は3口分（servoNum 1〜3）に
+  対応済みで、`server/serial_control.py`の`open_lid()`もservo_numを検証せずそのまま送信するため、
+  経路上はburnable(=3)も含めて疎通する構成になっています。ただし実機での開閉動作は必ず一度実測して確認してください。
+- ゴミのカウント確定は現状「AIが判定確定した瞬間」（`post_feed`）が正規ルートです。
+  投入口のフォトインタラプタ（`server/sensor_bridge.py`）による物理検知は、二重カウントを避けるため
+  デフォルトでFlaskへの送信を無効化しています。方針を変える場合は`server/README.md`の該当セクションを参照。
 
 ## 既知の制限
 
 - カメラ・モデルの実機依存が強く、パラメータ（距離ゲート・閾値など）は実測しながらの調整が前提
-- Flask/シリアルは未接続の環境ではスタブ動作となる。音声（VOICEVOX）は実装済みだが、
-  VOICEVOX ENGINEが起動していない環境では同様にスタブ動作（ログのみ）になる
+- Flask/シリアルは、それぞれのサーバー・Arduinoが未接続の環境ではスタブ動作となる。音声（VOICEVOX）も同様に、
+  VOICEVOX ENGINEが起動していない環境ではスタブ動作（ログのみ）になる

@@ -548,8 +548,10 @@ class="active-tab">
 <script>
 
 
+// 【統合】このページはFlask(server/app.py)自身から配信されるようになったので、
+// 相対パスでOK（本番PCのIPアドレスをここに書き換える必要がなくなった）
 const API_URL =
-"http://172.20.124.38:5000/api/status";
+"/api/status";
 
 
 

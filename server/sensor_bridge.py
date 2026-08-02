@@ -1,13 +1,41 @@
+"""
+server/sensor_bridge.py
+投入口のフォトインタラプタ（GarbageCounter.ino を書き込んだ「カウント用」Arduino）から
+CAN: / PETBOTTLE: / BURNABLE: を受信し、必要であればFlaskへカウントを送る橋渡しスクリプト。
+
+【統合時の重要な注意：二重カウントについて】
+このシステムは既に ai_core/State machine.py がAIの判定確定と同時に
+POST /api/feed を呼んでカウントしている（仕様書0-2節どおりの正規ルート）。
+このスクリプトも同時に /api/feed を叩くと「AIの判定」と「物理センサー通過」の
+両方でカウントされ、投入1個につき+2されてしまう。
+そのため ENABLE_DIRECT_FEED_POST はデフォルトで False にしてあり、
+今はセンサー検知をログ表示するだけ（Flaskへは送らない）動作になっている。
+
+もし「AI判定ではなく、物理的に投入口を通過したことをもってカウント確定にしたい」
+という方針に変更する場合は、
+  1. ENABLE_DIRECT_FEED_POST を True にする
+  2. ai_core/State machine.py 側の post_feed(...) 呼び出しをコメントアウトする
+の両方をセットで行うこと（どちらか片方だけ変更すると二重カウント／未カウントになる）。
+"""
+
 import time
 import requests
 import serial
 
-PORT = "COM4"  # 使用環境に合わせて設定
+# 【要変更】GarbageCounter.ino（フォトインタラプタ用）を書き込んだArduinoのCOMポート。
+# servo_3.ino（フタ開閉用）を書き込んだ別のArduino（server/serial_control.py の PORT="COM4"）
+# とは別の物理ポートになるはずなので、デバイスマネージャーで確認して設定すること。
+PORT = "COM5"  # 使用環境に合わせて設定（servo用のCOM4とは別ポート）
 BAUD_RATE = 9600
-# sensor_bridge.py 内の変更箇所
 
-# 仮想マシンのIPアドレスを指定
-FLASK_URL = "http://172.20.124.38:5000/api/feed"
+# 【構成メモ】このスクリプトは server/app.py（Flask）と同じ仮想マシン上で実行する想定
+# （2年生Bの開発環境）。同じマシン上で動かす前提なので localhost でOK。
+# ai_core/State machine.py 側は別のホストPC上で動くため、そちらは
+# 仮想マシンのIPアドレス（FLASK_SERVER_URL）を直接指定している（State machine.py参照）。
+FLASK_URL = "http://localhost:5000/api/feed"
+
+# 上記の「二重カウント注意」を参照。デフォルトはFalse＝ログ表示のみでFlaskには送らない。
+ENABLE_DIRECT_FEED_POST = False
 
 
 def main():
@@ -34,8 +62,13 @@ def main():
 
                 if trash_type:
                     print(f"【検知】 {trash_type}")
-                    # Flaskへ送信
-                    requests.post(FLASK_URL, json={"type": trash_type})
+                    if ENABLE_DIRECT_FEED_POST:
+                        # Flaskへ送信（AI側のpost_feedと併用すると二重カウントになるので注意。
+                        # ファイル冒頭のコメント参照）
+                        try:
+                            requests.post(FLASK_URL, json={"type": trash_type}, timeout=0.5)
+                        except Exception as e:
+                            print(f"[WARN] Flask送信失敗: {e}")
 
             # 🔥 Point 2: ループの待機時間を 0.01秒（10ms）に短縮
             time.sleep(0.01)

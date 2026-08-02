@@ -1,3 +1,6 @@
+// 【統合時メモ・現在未使用】
+// API配信・Web画面配信は server/app.py (Python/Flask) に一本化しました。
+// このNode.js版は実行しません。参考実装として残しています。
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");

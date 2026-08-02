@@ -1,3 +1,8 @@
+# 【参考コード・未使用】
+# 実際にArduino(GarbageCounter.ino)が送ってくるのは PASS1/PASS2/PASS3 ではなく
+# CAN: / PETBOTTLE: / BURNABLE: 形式（server/sensor_bridge.py が実際の受信処理）。
+# こちらは初期検討時のイメージ用スニペットとして残しています。
+
 # Python側（受信用イメージ）
 line = ser.readline().decode("utf-8").strip()
 

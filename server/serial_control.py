@@ -3,6 +3,10 @@ import serial
 
 # --- 設定項目 ---
 # 環境に合わせてCOMポートを変更してください
+# 【構成メモ】このArduino（servo_3.ino書き込み・フタ開閉用）と、
+# server/sensor_bridge.py が読む別のArduino（GarbageCounter.ino書き込み・
+# フォトインタラプタのカウント用）は物理的に別ポートになる。両方使う場合は
+# デバイスマネージャーでどちらがどのCOM番号か必ず確認すること。
 PORT = "COM4"
 BAUD_RATE = 9600
 

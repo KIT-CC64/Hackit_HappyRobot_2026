@@ -1,9 +1,27 @@
-from flask import Flask, jsonify, request
+import os
+
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__)
+# 【統合】1年生Cのステータス画面（site_flog/）をこのFlaskサーバーから直接配信する。
+# こうすることで「Flaskだけ起動すればWeb画面もAPIも同じPC・同じポートから出る」状態になり、
+# site_flog/index.html側で本番PCのIPアドレスをハードコードして毎回書き換える必要がなくなる
+# （index.html側のfetch先も相対パス "/api/status" に変更済み）。
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SITE_DIR = os.path.join(BASE_DIR, "..", "site_flog")
+
+app = Flask(__name__, static_folder=SITE_DIR, static_url_path="")
 # 他の端末（スマホなど）からのWebアクセスを許可する設定
 CORS(app)
+
+
+# --------------------------------------------------
+# Web画面配信：site_flog/index.html をルートで返す
+# （images/等の静的ファイルは static_folder 設定により自動で配信される）
+# --------------------------------------------------
+@app.route("/")
+def index():
+    return send_from_directory(SITE_DIR, "index.html")
 
 # カエルの状態管理（メモリ上に保持）
 # カエルの状態管理（初期値を直接変更）

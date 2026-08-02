@@ -1,3 +1,9 @@
+# 【統合時メモ・現在未使用】
+# API配信・Web画面配信は server/app.py に一本化しました（このファイルは起動しません）。
+# 理由：仕様書0-2節のJSON形式（hunger/level/exp/next_exp/stage/counts）に
+# 完全準拠しているのが server/app.py 側で、かつこちらはArduinoのシリアルポートを
+# 直接ここで掴んでしまうため、server/serial_control.py と同じCOMポートを取り合って
+# 競合する可能性がありました。参考実装として残していますが、実行しないでください。
 from flask import Flask, jsonify
 from flask_cors import CORS
 import serial

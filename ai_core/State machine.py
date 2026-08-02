@@ -1,7 +1,9 @@
+import os
+import sys
 import time
 from collections import deque, Counter
 from enum import Enum, auto
- 
+
 import cv2
 import numpy as np
 import pyrealsense2 as rs
@@ -21,9 +23,15 @@ try:
     _HAS_MEDIAPIPE = True
 except ImportError:
     _HAS_MEDIAPIPE = False
- 
-# 2年生B担当：serial_control.py（同じフォルダに置く想定）
+
+# 2年生B担当：server/serial_control.py（このファイルの1つ上の階層のserverフォルダに置く想定）
+# 【統合時修正】以前はここでパス解決をしておらず、serial_control.pyが実在しても
+# 常にImportErrorになりスタブ動作固定（＝実機のフタが物理的に開かない）状態だった。
+# voice側と同じ方式でserverフォルダをsys.pathに追加してから解決する。
 # まだファイルが無い/インポートできない環境でもスタブ動作で動き続けられるようにしておく
+_SERVER_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "server")
+if _SERVER_DIR not in sys.path:
+    sys.path.insert(0, _SERVER_DIR)
 try:
     from serial_control import open_lid
     _HAS_SERIAL_MODULE = True
@@ -32,9 +40,6 @@ except ImportError:
 
 # 1年生A担当：voice/voice_control.py（このファイルの1つ上の階層のvoiceフォルダに置く想定）
 # まだファイルが無い/インポートできない環境でもスタブ動作で動き続けられるようにしておく
-import os
-import sys
-
 _VOICE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "voice")
 if _VOICE_DIR not in sys.path:
     sys.path.insert(0, _VOICE_DIR)
@@ -100,6 +105,17 @@ class State(Enum):
  
  
 # ============================================================
+# ネットワーク設定
+# ============================================================
+# 【構成メモ】このState machine.py はRealSenseカメラが挿さっているノートPC（ホスト）上で
+# 直接実行する想定。一方 server/app.py（Flask）は2年生Bの仮想マシン上で動かす運用になった
+# ため、"localhost" では届かない。仮想マシンのIPアドレスに向けて送信する。
+# 【要確認】このIPは環境によって変わる可能性がある。本番前に2年生Bに最新のIPを確認し、
+# 必要ならここを書き換えること。
+FLASK_SERVER_URL = "http://172.20.125.69:5000"
+
+
+# ============================================================
 # 他担当インターフェースの呼び出し
 # ============================================================
 def send_serial_command(gomi_type):
@@ -111,12 +127,12 @@ def send_serial_command(gomi_type):
     if servo_num is None:
         print(f"[WARN] '{gomi_type}' に対応するservo_numが未定義です")
         return
- 
-    if gomi_type == "burnable":
-        # 上部の注意書き参照：2年生Bのopen_lid()にservo_num=3の定義が
-        # まだ無い可能性があるため、実機テスト前に必ず確認すること
-        print("[WARN] burnable用servo_num(=3)は2年生Bと要確認（open_lid仕様に未定義の可能性）")
- 
+
+    # 【統合時に確認】arduino/servo_3/servo_3.ino は3口分（servoNum 1〜3）に
+    # 対応済みで、server/serial_control.py の open_lid() も servo_num を検証せず
+    # そのまま送信するだけなので、burnable(=3)も含めて経路上は疎通する構成になっている。
+    # ただし実機での開閉動作は必ず一度実測して確認すること。
+
     if _HAS_SERIAL_MODULE:
         try:
             success = open_lid(servo_num)
@@ -130,17 +146,18 @@ def send_serial_command(gomi_type):
  
 def post_feed(gomi_type, correct=True):
     """2年生B担当：Flaskの POST /api/feed を呼ぶ関数。
-    サーバーが未起動でも例外を握りつぶしてスタブとして継続する。
+    サーバー（仮想マシン上のserver/app.py）が未起動・未到達でも例外を握りつぶして
+    スタブとして継続する。
     """
     try:
         import requests
         requests.post(
-            "http://localhost:5000/api/feed",
+            f"{FLASK_SERVER_URL}/api/feed",
             json={"type": gomi_type, "correct": correct},
             timeout=0.5,
         )
     except Exception as e:
-        print(f"[STUB] Flask送信スキップ（サーバー未起動の可能性）: {e}")
+        print(f"[STUB] Flask送信スキップ（サーバー未起動/仮想マシン未到達の可能性）: {e}")
  
  
 def play_voice(gomi_type, streak_count):
