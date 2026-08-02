@@ -7,6 +7,20 @@ import numpy as np
 import pyrealsense2 as rs
 from transformers import pipeline
 from PIL import Image
+
+# 手/腕の誤反応対策：MediaPipe Hands（Tasks API）で手を検出し、判定対象から除外する
+# 未インストール／モデルファイル未配置の環境でも動作は止めず、除外なしにフォールバックする
+try:
+    import mediapipe as mp
+    from mediapipe.tasks.python import BaseOptions
+    from mediapipe.tasks.python.vision import (
+        HandLandmarker,
+        HandLandmarkerOptions,
+        RunningMode,
+    )
+    _HAS_MEDIAPIPE = True
+except ImportError:
+    _HAS_MEDIAPIPE = False
  
 # 2年生B担当：serial_control.py（同じフォルダに置く想定）
 # まだファイルが無い/インポートできない環境でもスタブ動作で動き続けられるようにしておく
@@ -33,15 +47,21 @@ except ImportError:
 # ============================================================
 # 設定値（実測しながら調整すること）
 # ============================================================
-DETECT_MIN_M = 0.30          # 距離ゲート下限（使用カメラのMin-Zより大きく）
-DETECT_MAX_M = 0.50          # 距離ゲート上限
+DETECT_MIN_M = 0.20          # 距離ゲート下限（使用カメラのMin-Zより大きく）
+DETECT_MAX_M = 0.40          # 距離ゲート上限
 MIN_CONTOUR_AREA = 3000      # 検出領域の最小ピクセル数（ノイズ除去用）
 MOVEMENT_THRESHOLD_PX = 15   # これ以上動いたら「まだ静止してない」とみなしバッファをリセット
  
-WINDOW_SIZE = 6              # 何フレーム分の判定を貯めてから多数決するか
+WINDOW_SIZE = 4              # 何フレーム分の判定を貯めてから多数決するか
 CONSENSUS_RATIO = 0.6        # このバッファの中で同じラベルが何割以上を占めたら確定とするか
 CONFIDENCE_THRESHOLD = 0.5   # 1フレームごとの最低確信度（これ未満は"unknown"扱い）
  
+HAND_EXCLUDE_PAD_PX = 30      # 検出した手の矩形をこの分だけ外側に広げてから除外する
+BORDER_TOUCH_MARGIN_PX = 20   # この分だけ画面端に接している輪郭は「フレーム外から伸びる腕」とみなして除外する
+HAND_LANDMARKER_MODEL_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "hand_landmarker.task"
+)  # https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+
 MAX_RETRY = 3                # 何回連続でJUDGEに失敗したらフェイルセーフを検討するか
 FAILSAFE_DEFAULT_AFTER_RETRIES = None  # 例: "burnable" にすると規定回数失敗後に自動でその扱いにする（Noneなら無効）
  
@@ -62,7 +82,7 @@ LABEL_MAP = {
 SERVO_NUM_MAP = {
     "petbottle": 1,
     "can": 2,
-    "burnable": 3,  # ← 要確認（上部の注意書き参照。2年生Bのopen_lid()にまだ定義が無い可能性）
+    "burnable": 3,
 }
  
  
@@ -151,21 +171,112 @@ def play_retry_voice():
 # ============================================================
 # 距離ゲート付き物体検出（前回渡したv2スクリプトと同じロジック）
 # ============================================================
-def get_object_bbox(depth_image, depth_scale):
+def create_hand_landmarker():
+    """MediaPipe Tasks APIのHandLandmarkerを生成する。
+    mediapipe未インストール、またはモデルファイル未配置の場合はNoneを返す（呼び出し側は除外なしにフォールバック）。
+    """
+    if not _HAS_MEDIAPIPE:
+        print("[WARN] mediapipe未インストールのため、手/腕の除外は無効です（pip install mediapipe）")
+        return None
+    if not os.path.exists(HAND_LANDMARKER_MODEL_PATH):
+        print(f"[WARN] 手検出モデルが見つかりません: {HAND_LANDMARKER_MODEL_PATH}")
+        print("[WARN] 手/腕の除外は無効です。以下からダウンロードして配置してください:")
+        print("[WARN] https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task")
+        return None
+    options = HandLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=HAND_LANDMARKER_MODEL_PATH),
+        running_mode=RunningMode.VIDEO,
+        num_hands=2,
+        min_hand_detection_confidence=0.5,
+        min_hand_presence_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+    return HandLandmarker.create_from_options(options)
+
+
+def detect_hand_boxes(hands_detector, color_image, timestamp_ms, pad=HAND_EXCLUDE_PAD_PX):
+    """MediaPipe Hands（Tasks API）で手を検出し、(x0, y0, x1, y1)の矩形リストを返す。
+    未検出/未初期化時は空リスト。
+    """
+    if hands_detector is None:
+        return []
+    h, w = color_image.shape[:2]
+    rgb = cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB)
+    mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+    result = hands_detector.detect_for_video(mp_image, timestamp_ms)
+    boxes = []
+    for hand_landmarks in result.hand_landmarks:
+        xs = [lm.x * w for lm in hand_landmarks]
+        ys = [lm.y * h for lm in hand_landmarks]
+        x0 = max(int(min(xs)) - pad, 0)
+        y0 = max(int(min(ys)) - pad, 0)
+        x1 = min(int(max(xs)) + pad, w)
+        y1 = min(int(max(ys)) + pad, h)
+        boxes.append((x0, y0, x1, y1))
+    return boxes
+
+
+def _touches_border(x, y, w, h, frame_w, frame_h, margin=BORDER_TOUCH_MARGIN_PX):
+    """輪郭のバウンディングボックスが画面端に接しているかを判定する。
+    カメラの外から伸びてくる腕/手は、必ずどこかの辺でフレーム外に繋がっている＝
+    画面端に接する塊になるはず、という前提で「腕らしさ」の簡易フィルタとして使う。
+    （MediaPipeの手検出が漏れた/未インストールの場合の保険にもなる）
+    """
+    return (
+        x <= margin
+        or y <= margin
+        or (x + w) >= (frame_w - margin)
+        or (y + h) >= (frame_h - margin)
+    )
+
+
+def get_object_bbox(depth_image, depth_scale, exclude_rects=None):
+    """距離ゲート内の輪郭から、投入されたゴミ本体と思われるものを1つ選ぶ。
+
+    選定方針（優先順）：
+      1. 画面端に接していないこと（腕はフレーム外から伸びてくるので端に接する）
+      2. 面積がMIN_CONTOUR_AREA以上であること（ノイズ除去）
+      3. 上記を満たす輪郭の中で、平均深度が最小＝カメラに最も近いものを採用
+         （同じフレームに複数の塊が写っても「一番手前にあるもの」を優先する）
+    """
     depth_m = depth_image.astype(np.float32) * depth_scale
     mask = np.where(
         (depth_m > DETECT_MIN_M) & (depth_m < DETECT_MAX_M), 255, 0
     ).astype(np.uint8)
+    for x0, y0, x1, y1 in (exclude_rects or []):
+        mask[y0:y1, x0:x1] = 0
     kernel = np.ones((5, 5), np.uint8)
     mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
     mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     if not contours:
         return None
-    largest = max(contours, key=cv2.contourArea)
-    if cv2.contourArea(largest) < MIN_CONTOUR_AREA:
+
+    frame_h, frame_w = mask.shape[:2]
+    candidates = []
+    fallback = []  # 画面端接触フィルタで候補が0件になった場合の保険（面積のみで判定）
+    for c in contours:
+        area = cv2.contourArea(c)
+        if area < MIN_CONTOUR_AREA:
+            continue
+        x, y, w, h = cv2.boundingRect(c)
+
+        contour_mask = np.zeros(mask.shape, dtype=np.uint8)
+        cv2.drawContours(contour_mask, [c], -1, 255, thickness=cv2.FILLED)
+        mean_depth = cv2.mean(depth_m, mask=contour_mask)[0]
+
+        entry = (mean_depth, area, (x, y, w, h))
+        fallback.append(entry)
+        if not _touches_border(x, y, w, h, frame_w, frame_h):
+            candidates.append(entry)
+
+    pool = candidates if candidates else fallback
+    if not pool:
         return None
-    return cv2.boundingRect(largest)
+
+    # 深度が最小（＝カメラに一番近い）ものを優先。同距離なら面積が大きい方を採用
+    pool.sort(key=lambda item: (item[0], -item[1]))
+    return pool[0][2]
  
  
 def classify_crop(classifier, color_image, bbox):
@@ -202,7 +313,9 @@ def decide_consensus(buffer):
 def main():
     print("モデルを読み込み中...")
     classifier = pipeline("image-classification", model=MODEL_NAME)
- 
+
+    hands_detector = create_hand_landmarker()
+
     rs_pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
@@ -232,7 +345,9 @@ def main():
  
             depth_image = np.asanyarray(depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
-            bbox = get_object_bbox(depth_image, depth_scale)
+            timestamp_ms = int(color_frame.get_timestamp())
+            hand_boxes = detect_hand_boxes(hands_detector, color_image, timestamp_ms)
+            bbox = get_object_bbox(depth_image, depth_scale, exclude_rects=hand_boxes)
  
             key = cv2.waitKey(1) & 0xFF
  
@@ -357,6 +472,8 @@ def main():
     finally:
         rs_pipeline.stop()
         cv2.destroyAllWindows()
+        if hands_detector is not None:
+            hands_detector.close()
  
  
 if __name__ == "__main__":

@@ -21,8 +21,14 @@ RealSenseカメラで距離を測ってゴミを検知し、複数フレーム�
 - Python 3.9+ を推奨
 
 ```bash
-pip install pyrealsense2 opencv-python transformers torch pillow numpy requests
+pip install pyrealsense2 opencv-python transformers torch pillow numpy requests mediapipe
 ```
+
+- `mediapipe`はゴミをかざす手/腕を判定対象から除外するために使用（MediaPipe Tasks APIの`HandLandmarker`を利用。未インストールでも動作は止まるが、除外が効かず誤判定が起きやすくなる）
+- 手検出モデルファイル`hand_landmarker.task`を`ai_core`フォルダに配置すること（未配置でも動作は止まるが除外が無効になる）
+  ```bash
+  curl -L -o hand_landmarker.task https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task
+  ```
 
 - 2年生B担当の `serial_control.py` を `State machine.py` と同じフォルダに置くこと
   （`open_lid(servo_num: int) -> bool` を提供する想定）
@@ -70,6 +76,8 @@ COOLDOWN ◀── THANKS ◀── OPEN（サーボ・Flask・音声を呼び�
 |---|---|
 | `DETECT_MIN_M` / `DETECT_MAX_M` | 距離ゲートの範囲（m）。使用カメラのMin-Zより大きい値にすること |
 | `MIN_CONTOUR_AREA` | 検出領域の最小ピクセル数（ノイズ除去用） |
+| `HAND_EXCLUDE_PAD_PX` | MediaPipe Handsで検出した手の矩形をこの分だけ外側に広げてから判定対象（深度マスク）から除外する |
+| `HAND_LANDMARKER_MODEL_PATH` | `hand_landmarker.task`モデルファイルのパス（既定は`ai_core`フォルダ直下） |
 | `MOVEMENT_THRESHOLD_PX` | これ以上動くと「まだ静止していない」とみなしバッファをリセット |
 | `WINDOW_SIZE` | 多数決に使うフレーム数 |
 | `CONSENSUS_RATIO` | バッファ内で同じラベルが占める割合がこれ以上なら確定 |
