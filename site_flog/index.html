@@ -227,6 +227,65 @@ h2{
     transition:0.5s;
 
 }
+.stack-gauge{
+
+    width:80%;
+    height:60px;
+
+    background:#ddd;
+
+    border-radius:20px;
+
+    overflow:hidden;
+
+    display:flex;
+
+    flex-direction:row;
+
+}
+
+
+.stack{
+
+    height:100%;
+
+    display:flex;
+
+    justify-content:center;
+
+    align-items:center;
+
+    font-size:20px;
+
+    font-weight:bold;
+
+    transition:0.5s;
+
+}
+
+
+.pet{
+
+    background:#29B6F6;
+    color:white;
+
+}
+
+
+.burn{
+
+    background:#F44336;
+    color:white;
+
+}
+
+
+.can{
+
+    background:#FFD600;
+    color:black;
+
+}
 
 
 .status-text{
@@ -345,30 +404,27 @@ h2 img{
 </span>
 
 </div>
-<div class="home-status">
+<div class="stack-gauge">
 
-<div>
-🥫 缶
-<div class="gauge">
-<div id="homeCanGauge" class="gauge-inner"></div>
-</div>
-</div>
+    <div id="homeCanGauge" class="stack can">
+        🥫 缶
+        <span id="homeCanText">0%</span>
+    </div>
 
-<div>
-🔥 燃えるゴミ
-<div class="gauge">
-<div id="homeBurnGauge" class="gauge-inner"></div>
-</div>
-</div>
 
-<div>
-🧴 ペットボトル
-<div class="gauge">
-<div id="homePetGauge" class="gauge-inner"></div>
-</div>
-</div>
+    <div id="homeBurnGauge" class="stack burn">
+        🔥 燃えるゴミ
+        <span id="homeBurnText">0%</span>
+    </div>
+
+
+    <div id="homePetGauge" class="stack pet">
+        🧴 ペットボトル
+        <span id="homePetText">0%</span>
+    </div>
 
 </div>
+
 
 </div>
 
@@ -647,6 +703,17 @@ data.counts.petbottle;
 let canHunger = Math.min(data.counts.can * 10, 100);
 let burnableHunger = Math.min(data.counts.burnable * 10, 100);
 let petHunger = Math.min(data.counts.petbottle * 10, 100);
+
+document.getElementById("homeCanGauge").style.width =
+canPercent + "%";
+
+
+document.getElementById("homeBurnGauge").style.width =
+burnPercent + "%";
+
+
+document.getElementById("homePetGauge").style.width =
+petPercent + "%";
 
 // ホームは合計
 let homeHunger = Math.min(
