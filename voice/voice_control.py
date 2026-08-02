@@ -12,20 +12,41 @@ ai_core/State machine.py の play_voice() / play_retry_voice() スタブから
 - 音声合成・再生はステートマシンのメインループをブロックしないよう、
   専用ワーカースレッドで直列に処理する（同時に喋って音が重ならないようにするため）
 
-使い方（ai_core/State machine.py 側）：
+【2026-08-02 追記】事前キャッシュ方式に変更
+- 本番機はRealSense取得＋AI推論＋Flask＋シリアル通信×2＋VOICEVOX ENGINEを
+  ノートPC1台に全部集約して動かしている都合上、ゴミ検知直後（＝CPU負荷が
+  最も高い瞬間）に音声合成をその場でリクエストすると、6秒のタイムアウトを
+  超えてしまい「STUB: 再生失敗」になるケースが多発することが実機で判明した。
+- セリフはLINE_TEMPLATES / RETRY_LINESという固定テンプレートの組み合わせしか
+  存在しないため、本番前に一度 `python voice_control.py --warmup` を実行して
+  想定される全パターンを合成し、`voice/cache/*.wav` に保存しておく。
+- 本番中はplay_voice() / play_retry_voice()が生成するテキストに対応する
+  キャッシュ済みWAVをそのまま再生するだけになり、VOICEVOXへのHTTPリクエスト
+  自体が本番中に発生しなくなる（＝タイムアウトのリスクが原理的になくなる）。
+- キャッシュに無い想定外のテキスト（キャッシュ生成後にLINE_TEMPLATESを
+  書き換えた場合など）が来た場合のみ、保険としてその場で合成する
+  （FALLBACK_SYNTH_TIMEOUT=15秒。ここは滅多に通らない経路なので、多少
+  長くても本番の体験への影響は小さい）。
+
+使い方（ai_core/State machine.py 側、変更なし）：
     from voice_control import play_voice, play_retry_voice
     play_voice("petbottle", streak_count)   # 種類名 + 連続正解数
     play_retry_voice()                      # 「もう一回近づけてケロ」
 
-単体テスト：
-    python voice_control.py
+事前キャッシュ生成（本番当日・セリフ変更後は必ず一度実行しておくこと）：
+    python voice_control.py --warmup
     （事前にVOICEVOXアプリを起動しておくこと。詳細はvoice/README.md参照）
+
+単体テスト（再生確認）：
+    python voice_control.py
 """
 
+import hashlib
 import platform
 import queue
 import random
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -42,8 +63,16 @@ SPEAKER_STYLE = "ノーマル"
 FALLBACK_SPEAKER_ID = 3  # /speakers取得に失敗した場合のフォールバック
                           # （多くのVOICEVOXバージョンで「ずんだもん(ノーマル)」= 3。
                           #   ずれていた場合は list_speakers.py で確認して書き換える）
-REQUEST_TIMEOUT = 6.0
+REQUEST_TIMEOUT = 6.0          # 通常の合成リクエスト（主に--warmup時に使用）のタイムアウト
+FALLBACK_SYNTH_TIMEOUT = 15.0  # キャッシュ未ヒット時のみ使う保険用の長めタイムアウト
 ENGINE_START_WAIT_SEC = 15  # VOICEVOX起動直後で/speakersがまだ応答しない場合の最大待ち時間
+
+# 事前キャッシュで「{n}個目」の何個目まで面倒を見るか。
+# これを超えるstreak_countが来た場合はこの値にクランプしてから文言を作るので、
+# 本番中に未キャッシュのテキストが生成されることは基本的に無い。
+MAX_CACHED_STREAK = 20
+
+CACHE_DIR = Path(__file__).resolve().parent / "cache"
 
 # ============================================================
 # セリフテンプレート（タスク1-2仕様：3種類＋確信度低の計4パターン以上）
@@ -127,20 +156,20 @@ def wait_for_engine(timeout_sec=ENGINE_START_WAIT_SEC):
 # ============================================================
 # 音声合成・再生
 # ============================================================
-def _synthesize(text: str) -> bytes:
+def _synthesize(text: str, timeout: float = REQUEST_TIMEOUT) -> bytes:
     """VOICEVOX ENGINEにテキストを渡し、WAVバイト列を返す。"""
     speaker_id = _resolve_speaker_id()
     query_resp = requests.post(
         f"{VOICEVOX_URL}/audio_query",
         params={"text": text, "speaker": speaker_id},
-        timeout=REQUEST_TIMEOUT,
+        timeout=timeout,
     )
     query_resp.raise_for_status()
     synth_resp = requests.post(
         f"{VOICEVOX_URL}/synthesis",
         params={"speaker": speaker_id},
         json=query_resp.json(),
-        timeout=REQUEST_TIMEOUT,
+        timeout=timeout,
     )
     synth_resp.raise_for_status()
     return synth_resp.content
@@ -180,6 +209,103 @@ def _play_wav_bytes(wav_bytes: bytes):
                     Path(tmp_path).unlink(missing_ok=True)
 
 
+# ============================================================
+# 事前キャッシュ（本番中はここだけを参照して再生する）
+# ============================================================
+_memory_cache = {}
+_memory_cache_lock = threading.Lock()
+
+
+def _cache_path(text: str) -> Path:
+    # 日本語・記号を含むテキストをそのままファイル名にすると環境依存の問題が出るため、
+    # sha1ハッシュ名で保存する（中身の対応関係はこのファイル内のロジックだけで完結する）。
+    h = hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
+    return CACHE_DIR / f"{h}.wav"
+
+
+def _save_cache(text: str, data: bytes):
+    try:
+        CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        _cache_path(text).write_bytes(data)
+    except Exception as e:
+        print(f"[voice][WARN] キャッシュ保存失敗（続行、今回はメモリ内キャッシュのみ有効）: {e}")
+    with _memory_cache_lock:
+        _memory_cache[text] = data
+
+
+def _get_cached_or_synthesize(text: str) -> bytes:
+    with _memory_cache_lock:
+        cached = _memory_cache.get(text)
+    if cached is not None:
+        return cached
+
+    path = _cache_path(text)
+    if path.exists():
+        data = path.read_bytes()
+        with _memory_cache_lock:
+            _memory_cache[text] = data
+        return data
+
+    # ここに来るのは「--warmupを実行し忘れている」か「LINE_TEMPLATESを変更したのに
+    # 再warmupしていない」場合のみのはず。デモ中にここを通ると元のタイムアウト問題が
+    # 再発するため、保険として長めのタイムアウトで一度だけ試みる。
+    print(f"[voice][WARN] キャッシュ未ヒット、ライブ合成にフォールバック（要:再warmup）: '{text}'")
+    data = _synthesize(text, timeout=FALLBACK_SYNTH_TIMEOUT)
+    _save_cache(text, data)
+    return data
+
+
+def _all_expected_texts():
+    """LINE_TEMPLATES / RETRY_LINES から、本番で実際に生成されうる全テキストを列挙する。"""
+    texts = set()
+    for templates in LINE_TEMPLATES.values():
+        for template in templates:
+            if "{n}" in template:
+                for n in range(1, MAX_CACHED_STREAK + 1):
+                    texts.add(template.format(n=n))
+            else:
+                texts.add(template)
+    texts.update(RETRY_LINES)
+    return sorted(texts)
+
+
+def warmup_cache(verbose: bool = True) -> bool:
+    """
+    本番前に一度呼ぶことで、想定される全セリフを事前合成し voice/cache/ に保存する。
+    既にキャッシュ済みのファイルはスキップされるので、2回目以降はほぼ一瞬で終わる。
+    実行方法: python voice_control.py --warmup
+    """
+    if not wait_for_engine(timeout_sec=ENGINE_START_WAIT_SEC):
+        print("[voice][ERROR] VOICEVOX ENGINEに接続できないため事前キャッシュを中断します。"
+              "VOICEVOXアプリを起動してから再実行してください。")
+        return False
+
+    texts = _all_expected_texts()
+    total = len(texts)
+    print(f"[voice] 事前キャッシュ生成開始（{total}件、既存キャッシュはスキップ）...")
+    ok, skipped, ng = 0, 0, 0
+    for i, text in enumerate(texts, 1):
+        path = _cache_path(text)
+        if path.exists():
+            skipped += 1
+        else:
+            try:
+                data = _synthesize(text, timeout=FALLBACK_SYNTH_TIMEOUT)
+                _save_cache(text, data)
+                ok += 1
+            except Exception as e:
+                ng += 1
+                print(f"[voice][WARN] キャッシュ生成失敗: '{text}' ({e})")
+        if verbose and i % 10 == 0:
+            print(f"[voice]   {i}/{total} 件処理済み...")
+
+    print(f"[voice] 事前キャッシュ生成完了: 新規{ok}件 / 既存{skipped}件 / 失敗{ng}件 -> {CACHE_DIR}")
+    if ng > 0:
+        print("[voice][WARN] 失敗した項目があります。VOICEVOXが起動した状態でもう一度 "
+              "`python voice_control.py --warmup` を実行してください。")
+    return ng == 0
+
+
 # ---- 再生キュー（同時に複数のセリフが重ならないよう直列で再生する）----
 _speech_queue = queue.Queue(maxsize=4)
 
@@ -188,7 +314,7 @@ def _worker():
     while True:
         text = _speech_queue.get()
         try:
-            wav_bytes = _synthesize(text)
+            wav_bytes = _get_cached_or_synthesize(text)
             _play_wav_bytes(wav_bytes)
         except Exception as e:
             print(f"[voice][STUB] VOICEVOX再生失敗、ログのみ: '{text}' ({e})")
@@ -220,7 +346,15 @@ def play_voice(gomi_type: str, streak_count: int):
     if not templates:
         print(f"[voice][WARN] 未知のgomi_type: {gomi_type}")
         return
-    text = random.choice(templates).format(n=streak_count)
+    template = random.choice(templates)
+    if "{n}" in template:
+        # MAX_CACHED_STREAKを超える回数が来ても、事前キャッシュにヒットするよう
+        # クランプする（音声のセリフ表示上の数字と、Web画面側の実カウントは別管理なので
+        # ここで多少丸めても実害はない）。
+        n = min(streak_count, MAX_CACHED_STREAK)
+        text = template.format(n=n)
+    else:
+        text = template
     _enqueue_speech(text)
 
 
@@ -230,10 +364,15 @@ def play_retry_voice():
 
 
 # ============================================================
-# 単体テスト（VOICEVOXアプリを起動した状態で実行すること）
+# CLI: 事前キャッシュ生成 / 単体テスト
 # ============================================================
 if __name__ == "__main__":
-    print("=== VOICEVOX疎通テスト ===")
+    if "--warmup" in sys.argv:
+        print("=== VOICEVOX 事前キャッシュ生成 ===")
+        success = warmup_cache()
+        sys.exit(0 if success else 1)
+
+    print("=== VOICEVOX疎通テスト（再生確認） ===")
     if not wait_for_engine(timeout_sec=5):
         print("ENGINEに接続できていませんが、スタブ動作の確認としてそのまま続行します。")
 

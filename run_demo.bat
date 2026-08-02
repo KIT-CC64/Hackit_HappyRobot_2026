@@ -13,6 +13,8 @@ echo [事前確認2] サーボ制御用Arduino・カウント用Arduinoの2台�
 echo            このPCにUSB接続済みですか？（未接続でもデモ自体は止まりません）
 echo [事前確認3] Arduino IDEのシリアルモニタは閉じてありますか？
 echo            （開いたままだとポートが占有されPythonから接続できません）
+echo [事前確認4] voice\warmup_voice_cache.bat を一度実行済みですか？
+echo            （未実施だと本番中に音声合成タイムアウトで声が出ないことがあります）
 echo.
 pause
 

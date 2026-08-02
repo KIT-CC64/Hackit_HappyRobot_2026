@@ -61,3 +61,6 @@ test_data/
 
 # MediaPipe Hands（手検出）のモデルファイル（約7.4MB、READMEの手順で各自ダウンロード）
 ai_core/hand_landmarker.task
+
+# VOICEVOX事前キャッシュ（各自のPCでpython voice_control.py --warmupすれば再生成される）
+voice/cache/
