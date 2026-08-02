@@ -498,30 +498,7 @@ h2 img{
 
 🐸
 
-</div>
 
-
-<div class="gauge">
-
-<div id="gauge" class="gauge-inner">
-
-</div>
-
-</div>
-
-
-<div class="status-text">
-
-満腹度：
-<span id="hunger">
-0
-</span>
-%
-
-</div>
-
-
-</div>
 
 
 
@@ -622,6 +599,12 @@ button.classList.add("active-tab");
 
 function updateScreen(data){
 
+function setGauge(id, value, color){
+
+    document.getElementById(id).style.width = value + "%";
+    document.getElementById(id).style.backgroundColor = color;
+
+}
 
 
 document.getElementById("can")
@@ -657,21 +640,33 @@ let homeHunger = Math.min(
     100
 );
 
-// ホーム
+// ホーム（緑）
+let homeColor = "#F44336";
+
+if(homeHunger >= 75){
+    homeColor = "#4CAF50";
+}
+else if(homeHunger >= 50){
+    homeColor = "#8BC34A";
+}
+else if(homeHunger >= 25){
+    homeColor = "#FFC107";
+}
+
 document.getElementById("homeHunger").innerHTML = homeHunger;
-document.getElementById("homeGauge").style.width = homeHunger + "%";
+setGauge("homeGauge", homeHunger, homeColor);
 
-// 缶
+// 缶（黄色）
 document.getElementById("canHunger").innerHTML = canHunger;
-document.getElementById("canGauge").style.width = canHunger + "%";
+setGauge("canGauge", canHunger, "#FFD600");
 
-// 燃えるゴミ
+// 燃えるゴミ（赤）
 document.getElementById("burnableHunger").innerHTML = burnableHunger;
-document.getElementById("burnableGauge").style.width = burnableHunger + "%";
+setGauge("burnableGauge", burnableHunger, "#F44336");
 
-// ペットボトル
+// ペットボトル（水色）
 document.getElementById("petHunger").innerHTML = petHunger;
-document.getElementById("petGauge").style.width = petHunger + "%";
+setGauge("petGauge", petHunger, "#29B6F6");
 
 
 
