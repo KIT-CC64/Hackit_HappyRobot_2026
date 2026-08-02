@@ -229,8 +229,8 @@ h2{
 }
 .stack-gauge{
 
-    width:80%;
-    height:60px;
+    width:100px;
+    height:300px;
 
     background:#ddd;
 
@@ -240,7 +240,7 @@ h2{
 
     display:flex;
 
-    flex-direction:row;
+    flex-direction:column-reverse;
 
 }
 
@@ -412,25 +412,17 @@ h2 img{
 </div>
 <div class="stack-gauge">
 
-    <div id="homeCanGauge" class="stack can">
-        🥫 缶
-        <span id="homeCanText">0%</span>
+    <div id="homePetGauge" class="stack pet">
+        🧴<span id="homePetText">0%</span>
     </div>
-
 
     <div id="homeBurnGauge" class="stack burn">
-        🔥 燃えるゴミ
-        <span id="homeBurnText">0%</span>
+        🔥<span id="homeBurnText">0%</span>
     </div>
 
-
-    <div id="homePetGauge" class="stack pet">
-        🧴 ペットボトル
-        <span id="homePetText">0%</span>
+    <div id="homeCanGauge" class="stack can">
+        🥫<span id="homeCanText">0%</span>
     </div>
-
-</div>
-
 
 </div>
 
@@ -464,14 +456,7 @@ h2 img{
 
 
 </div>
-<div class="gauge">
-    <div id="canGauge" class="gauge-inner"></div>
-</div>
 
-<div class="status-text">
-満腹度：
-<span id="canHunger">0</span>%
-</div>
 
 </div>
 
@@ -506,14 +491,7 @@ h2 img{
 
 
 </div>
-<div class="gauge">
-    <div id="burnableGauge" class="gauge-inner"></div>
-</div>
 
-<div class="status-text">
-満腹度：
-<span id="burnableHunger">0</span>%
-</div>
 
 </div>
 
@@ -548,14 +526,7 @@ h2 img{
 
 
 </div>
-<div class="gauge">
-    <div id="petGauge" class="gauge-inner"></div>
-</div>
 
-<div class="status-text">
-満腹度：
-<span id="petHunger">0</span>%
-</div>
 
 </div>
 
@@ -747,14 +718,15 @@ burnPercent + "%";
 document.getElementById("homePetText").innerHTML =
 petPercent + "%";
 
-// ホーム横棒の幅変更
-document.getElementById("homeCanGauge").style.width =
+// 縦型積み上げグラフの高さ変更
+
+document.getElementById("homeCanGauge").style.height =
 canPercent + "%";
 
-document.getElementById("homeBurnGauge").style.width =
+document.getElementById("homeBurnGauge").style.height =
 burnPercent + "%";
 
-document.getElementById("homePetGauge").style.width =
+document.getElementById("homePetGauge").style.height =
 petPercent + "%";
 
 // ホームは合計
