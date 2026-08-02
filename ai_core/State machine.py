@@ -331,7 +331,7 @@ def main():
     streak_count = 0
     committed_label = None
     state_entered_at = time.time()
- 
+    last_timestamp_ms = -1
     print("起動完了。'q'で終了 / '1','2','3'で手動フェイルセーフ")
  
     try:
@@ -346,6 +346,9 @@ def main():
             depth_image = np.asanyarray(depth_frame.get_data())
             color_image = np.asanyarray(color_frame.get_data())
             timestamp_ms = int(color_frame.get_timestamp())
+            if timestamp_ms <= last_timestamp_ms:
+                timestamp_ms = last_timestamp_ms + 1
+            last_timestamp_ms = timestamp_ms
             hand_boxes = detect_hand_boxes(hands_detector, color_image, timestamp_ms)
             bbox = get_object_bbox(depth_image, depth_scale, exclude_rects=hand_boxes)
  
