@@ -345,7 +345,14 @@ h2 img{
 </span>
 
 </div>
+<div class="gauge">
+    <div id="homeGauge" class="gauge-inner"></div>
+</div>
 
+<div class="status-text">
+満腹度：
+<span id="homeHunger">0</span>%
+</div>
 
 </div>
 
@@ -379,7 +386,14 @@ h2 img{
 
 
 </div>
+<div class="gauge">
+    <div id="canGauge" class="gauge-inner"></div>
+</div>
 
+<div class="status-text">
+満腹度：
+<span id="canHunger">0</span>%
+</div>
 
 </div>
 
@@ -414,7 +428,14 @@ h2 img{
 
 
 </div>
+<div class="gauge">
+    <div id="burnableGauge" class="gauge-inner"></div>
+</div>
 
+<div class="status-text">
+満腹度：
+<span id="burnableHunger">0</span>%
+</div>
 
 </div>
 
@@ -449,7 +470,14 @@ h2 img{
 
 
 </div>
+<div class="gauge">
+    <div id="petGauge" class="gauge-inner"></div>
+</div>
 
+<div class="status-text">
+満腹度：
+<span id="petHunger">0</span>%
+</div>
 
 </div>
 
@@ -616,42 +644,34 @@ data.counts.petbottle;
 
 
 
-// ゴミ10個で満腹100%
+// 各ゴミの満腹度
+let canHunger = Math.min(data.counts.can * 10, 100);
+let burnableHunger = Math.min(data.counts.burnable * 10, 100);
+let petHunger = Math.min(data.counts.petbottle * 10, 100);
 
-let total =
+// ホームは合計
+let homeHunger = Math.min(
+    canHunger +
+    burnableHunger +
+    petHunger,
+    100
+);
 
-data.counts.can +
+// ホーム
+document.getElementById("homeHunger").innerHTML = homeHunger;
+document.getElementById("homeGauge").style.width = homeHunger + "%";
 
-data.counts.burnable +
+// 缶
+document.getElementById("canHunger").innerHTML = canHunger;
+document.getElementById("canGauge").style.width = canHunger + "%";
 
-data.counts.petbottle;
+// 燃えるゴミ
+document.getElementById("burnableHunger").innerHTML = burnableHunger;
+document.getElementById("burnableGauge").style.width = burnableHunger + "%";
 
-
-
-let hunger =
-
-total * 10;
-
-
-
-if(hunger > 100){
-
-    hunger = 100;
-
-}
-
-
-
-
-document.getElementById("hunger")
-.innerHTML =
-hunger;
-
-
-
-document.getElementById("gauge")
-.style.width =
-hunger + "%";
+// ペットボトル
+document.getElementById("petHunger").innerHTML = petHunger;
+document.getElementById("petGauge").style.width = petHunger + "%";
 
 
 
