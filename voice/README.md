@@ -1,98 +1,56 @@
-# 音声（VOICEVOX連携） - ケロッと！はらぺこエコガエル
+# 音声（VOICEVOX連携） - voice/
 
-タスク1-2（1年生A担当）：ゴミの種類・状況に応じてカエルが違うセリフをVOICEVOXで
-その場生成・再生するモジュールです。`ai_core/State machine.py` の `play_voice()` /
-`play_retry_voice()` スタブから呼び出される想定で作ってあります。
+ゴミの種類・状況に応じてカエルのセリフをVOICEVOXで生成・再生するモジュールです。`ai_core/State machine.py`の`play_voice()` / `play_retry_voice()`から呼び出されます。
 
 ## できること
 
-- `play_voice(gomi_type, streak_count)`：`"petbottle" / "can" / "burnable"` それぞれに
-  複数パターンのセリフを用意し、ランダムに選んで喋る（`{n}個目だよ！` に連続正解数を埋め込む）
-- `play_retry_voice()`：判定不能（確信度が低い）ときの「もう一回近づけてケロ」
-- VOICEVOX ENGINEが未起動／通信エラーの場合は例外を握りつぶし、ログだけ出して
-  処理を止めない（他パートのスタブと同じフェイルセーフ方針）
-- 音声合成・再生は専用スレッドで直列処理するので、ステートマシンのメインループ
-  （カメラ映像の描画など）をブロックしない
+- `play_voice(gomi_type, streak_count)`：`petbottle` / `can` / `burnable`それぞれに複数パターンのセリフを用意し、ランダムに選んで再生（`{n}個目だよ！`に連続正解数を埋め込む）
+- `play_retry_voice()`：判定不能時の「もう一回近づけてケロ」
+- VOICEVOX ENGINEが未起動／通信エラーの場合はログのみを出して処理を止めない
+- 音声合成・再生は専用スレッドで直列処理し、ステートマシンのメインループをブロックしない
 
-## 【2026-08-02 追記】事前キャッシュ方式に変更（重要）
+## 事前キャッシュ方式
 
-実機統合テストで、「音声がほぼ鳴らない（VOICEVOX再生失敗、read timed out）」という
-症状が発生しました。原因は、本番機がRealSense取得＋AI推論＋Flask＋シリアル通信×2＋
-VOICEVOX ENGINEをノートPC1台に集約して動かしている都合上、ゴミ検知直後（＝CPU負荷が
-最も高い瞬間）に音声合成をその場でHTTPリクエストすると、6秒のタイムアウトを
-超えてしまうことが多いためでした。
+本番機はRealSense・AI推論・Flask・シリアル通信・VOICEVOX ENGINEを1台のノートPCに集約するため、ゴミ検知直後（CPU負荷が高い瞬間）にその場で音声合成すると、HTTPリクエストがタイムアウトしやすくなります。そのため、セリフのテンプレート（`LINE_TEMPLATES` / `RETRY_LINES`）を本番前に一度すべて合成して`voice/cache/*.wav`に保存しておき、本番中はキャッシュ済みWAVを再生するだけにしています。
 
-対策として、セリフは`LINE_TEMPLATES` / `RETRY_LINES`という固定テンプレートの
-組み合わせしか存在しないことを利用し、**本番前に一度全パターンを合成して
-`voice/cache/*.wav` に保存しておき、本番中はキャッシュ済みWAVを再生するだけ**に
-変更しました。これにより本番中はVOICEVOXへのHTTPリクエスト自体が発生しなくなり、
-タイムアウトのリスクが原理的になくなります。
-
-**本番当日・セリフを変更した日は、必ず一度以下のどちらかを実行してください**
-（VOICEVOXアプリを起動した状態で）：
+**本番当日・セリフを変更した日は、必ず事前にキャッシュを生成してください**（VOICEVOXアプリを起動した状態で）：
 
 ```bash
 python voice_control.py --warmup
 ```
 
-またはダブルクリックで `voice/warmup_voice_cache.bat` を実行。
+またはダブルクリックで`voice/warmup_voice_cache.bat`を実行。
 
-- 初回（キャッシュが空の状態）は十数個〜百個弱のセリフを順に合成するため、
-  数分かかることがあります。**カメラやAI推論を起動する前、CPUが空いている
-  タイミングで実行するのがおすすめです。**
-- 2回目以降は、既にキャッシュ済みのファイルはスキップされるのでほぼ一瞬で終わります。
-- `LINE_TEMPLATES` / `RETRY_LINES` にセリフを追加・変更した場合は、
-  必ずもう一度warmupを実行してください（キャッシュに無い新しいテキストは
-  本番中に初めて再生しようとした瞬間、従来通りその場合成＝タイムアウトの
-  リスクが復活してしまいます）。
-- `{n}個目だよ！` のような連続正解数入りのセリフは、`MAX_CACHED_STREAK`
-  （デフォルト20）までを事前キャッシュします。デモ中にこれを超える回数
-  ゴミを入れても、セリフ上の数字は20で頭打ちになりますが、Web画面側の
-  実際のカウント・レベルには影響しません（音声はあくまで演出用の文言です）。
-- 万が一キャッシュに無いテキストが本番中に来た場合（warmup忘れ等）は、
-  保険として15秒タイムアウトでその場合成にフォールバックします
-  （本来この経路を通らないのが正しい状態です）。
+- 初回は数分かかることがあります。カメラやAI推論を起動する前、CPUが空いているタイミングで実行してください
+- 2回目以降、既にキャッシュ済みのファイルはスキップされるためほぼ一瞬で終わります
+- `LINE_TEMPLATES` / `RETRY_LINES`を追加・変更した場合は必ずwarmupを再実行してください
+- `{n}個目だよ！`のような連続正解数入りのセリフは`MAX_CACHED_STREAK`（既定20）まで事前キャッシュします。それを超える回数投入しても、セリフ上の数字は20で頭打ちになりますが、Web画面側の実際のカウント・レベルには影響しません
+- キャッシュに無いテキストが本番中に来た場合は、保険として15秒タイムアウトでその場合成にフォールバックします
 
 ## 事前準備：VOICEVOX ENGINEのセットアップ（Windows）
 
-1. https://voicevox.hiroshiba.jp/ からVOICEVOXをダウンロード（Windows版インストーラ）
-2. インストールして起動する。起動すると自動的に音声合成エンジンが
-   `http://127.0.0.1:50021` で待ち受け状態になる（アプリのウィンドウは
-   最小化・タスクトレイに置いたままでOK、閉じるとエンジンも止まるので注意）
-3. 動作確認：ブラウザで http://127.0.0.1:50021/docs を開き、Swagger UIの画面が
-   表示されればOK。または以下でも確認できる：
-   ```
+1. https://voicevox.hiroshiba.jp/ からVOICEVOXをダウンロード
+2. インストールして起動する（起動すると`http://127.0.0.1:50021`で待ち受け状態になる。ウィンドウは最小化・タスクトレイに置いたままでOK、閉じるとエンジンも止まる）
+3. 動作確認：ブラウザで http://127.0.0.1:50021/docs を開き、Swagger UIが表示されればOK
+   ```bash
    curl http://127.0.0.1:50021/version
    ```
-4. 話者一覧の確認（「ずんだもん」のID・スタイル名を確認したい場合）：
-   ```
+4. 話者一覧の確認：
+   ```bash
    python list_speakers.py
    ```
 
-**本番当日の注意**：VOICEVOXアプリは推論スクリプト（`State machine.py`）を動かす
-**前に**起動しておくこと。エンジン起動には数秒〜十数秒かかるため、リハーサル時は
-`voice_control.py` 内の `wait_for_engine()` で疎通確認してから本番に臨むと安心。
-さらに**カメラ・AI推論を起動する前に `--warmup` を一度実行しておくこと**
-（上記「事前キャッシュ方式」参照）。
+VOICEVOXアプリは`State machine.py`を動かす前に起動しておいてください（エンジン起動には数秒〜十数秒かかります）。カメラ・AI推論を起動する前に`--warmup`を一度実行しておくことも忘れずに。
 
-## Pythonの依存パッケージ
-
-`ai_core/README.md` の手順で `requests` は入っている想定ですが、voiceフォルダ単体で
-動かす場合は以下だけでOK（Windowsなら`winsound`は標準ライブラリなので追加インストール不要）：
+## 依存パッケージ
 
 ```bash
 pip install requests
 ```
 
-## 事前キャッシュ生成（本番前に必ず実行）
+（Windowsの`winsound`は標準ライブラリのため追加インストール不要）
 
-```bash
-python voice_control.py --warmup
-```
-
-または `voice/warmup_voice_cache.bat` をダブルクリック。
-
-## 単体テスト（再生確認）
+## 単体テスト
 
 VOICEVOXアプリを起動した状態で：
 
@@ -100,51 +58,29 @@ VOICEVOXアプリを起動した状態で：
 python voice_control.py
 ```
 
-petbottle → can → burnable → retry の順に4パターン喋れば疎通OK
-（`--warmup`済みならキャッシュ再生、未実施ならその場合成で確認されます）。
+petbottle → can → burnable → retry の順に4パターン再生されれば疎通OKです。
 
 ## ai_core/State machine.py との連携
-
-`State machine.py` 側は `play_voice()` / `play_retry_voice()` の中で、同階層から見て
-一つ上の `voice/` フォルダにある本モジュールを import するようにしてあります
-（`voice_control.py` が無い/importできない環境でも自動でログのみのスタブ動作に
-フォールバックするので、統合前でも各自の単体テストが止まりません）。
 
 ```python
 from voice_control import play_voice, play_retry_voice
 
-play_voice("petbottle", streak_count)  # 種類名 + 連続正解数
+play_voice("petbottle", streak_count)
 play_retry_voice()
 ```
 
-呼び出し側のインターフェースは変更していないため、`State machine.py`側の
-修正は不要です。
+`voice_control.py`が無い／importできない環境では自動でスタブ動作にフォールバックします。
 
 ## セリフのカスタマイズ
 
-`voice_control.py` 冒頭の `LINE_TEMPLATES` / `RETRY_LINES` にテキストを追加するだけで
-バリエーションが増やせます（毎回ランダムに1つ選んで再生）。エンタメ性を上げたい場合は
-ここにレベルアップ演出用のセリフなどを足していくと良さそうです（時間があれば）。
+`voice_control.py`冒頭の`LINE_TEMPLATES` / `RETRY_LINES`にテキストを追加するとバリエーションが増やせます。追加・変更したら`python voice_control.py --warmup`を再実行してキャッシュを更新してください。
 
-**追加・変更したら、必ず `python voice_control.py --warmup` を再実行してキャッシュを
-更新してください。** 忘れると、新しいセリフだけ本番中にその場合成＝タイムアウトの
-リスクが残ったままになります。
+## 話者を変更する場合
 
-## 話者を変えたい場合
+`voice_control.py`の`SPEAKER_NAME` / `SPEAKER_STYLE`を書き換えると、`/speakers`から自動的に該当IDを解決します。話者変更後は`voice/cache/`を削除してから`--warmup`を再実行してください。
 
-`voice_control.py` の `SPEAKER_NAME` / `SPEAKER_STYLE` を書き換えるだけで、
-`/speakers` から自動的に該当IDを解決します（`python list_speakers.py` で
-利用可能な名前一覧を確認できます）。話者を変更した場合、既存のキャッシュ
-（`voice/cache/`）は古い話者の声のままなので、フォルダごと削除してから
-`--warmup` を再実行してください。
+## 既知の制限
 
-## 既知の制限・今後の改善候補
-
-- `{n}個目`の`n`は`MAX_CACHED_STREAK`（デフォルト20）までしか事前キャッシュしない。
-  デモでそれ以上の連続投入が想定される場合は値を大きくして再warmupすること。
-- 複数セリフが同時に来た場合は再生キューで直列化しているが、キューが詰まると
-  古いセリフから捨てられる（`queue.Queue(maxsize=4)`）。連続投入が多い場合は
-  上限値を調整すること。
-- `voice/cache/`はコード側からは自動生成されるバイナリ(.wav)フォルダなので、
-  `.gitignore`に含めてリポジトリを汚さないようにするのがおすすめ（各自の
-  ノートPCでwarmupし直せば再生成される）。
+- `{n}個目`の`n`は`MAX_CACHED_STREAK`（既定20）までしか事前キャッシュしない
+- 再生キューは`queue.Queue(maxsize=4)`で直列化しており、詰まると古いセリフから捨てられる
+- `voice/cache/`は自動生成されるバイナリ(.wav)フォルダのため`.gitignore`で除外済み
