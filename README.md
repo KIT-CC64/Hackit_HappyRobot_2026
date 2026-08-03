@@ -29,12 +29,12 @@ Happy Robot
 
 - スクリーンショット：
 
-  <img src="docs_images/final.jpg" alt="完成した分別強制ゴミ箱の実機" width="300" height="364">
+  <img src="docs_images/final.jpg" alt="完成した分別強制ゴミ箱の実機" width="300">
 
   カエルの口3つ（青＝ペットボトル／黄＝缶／赤＝燃えるゴミ）と、RealSenseカメラ、
   「ここの前に持っているごみをかざしてケロ！」の吹き出しを備えた実機。
 
-  <img src="docs_images/v2_kogaeru.png" alt="完成したウェブブラウザのスクリーンショット" width="300" height="364">
+  <img src="docs_images/v2_kogaeru.png" alt="完成したウェブブラウザのスクリーンショット" width="300">
 
 　捨てたごみがリアルタイムで反映されるウェブブラウザ。
 　ゴミを一定数捨てると、レベルがアップしてカエルが成長していく。
