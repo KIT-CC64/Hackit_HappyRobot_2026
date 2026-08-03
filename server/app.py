@@ -1,24 +1,48 @@
-from flask import Flask, jsonify, request
+import os
+
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__)
+# 【統合】1年生Cのステータス画面（site_flog/）をこのFlaskサーバーから直接配信する。
+# こうすることで「Flaskだけ起動すればWeb画面もAPIも同じPC・同じポートから出る」状態になり、
+# site_flog/index.html側で本番PCのIPアドレスをハードコードして毎回書き換える必要がなくなる
+# （index.html側のfetch先も相対パス "/api/status" に変更済み）。
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+SITE_DIR = os.path.join(BASE_DIR, "..", "site_flog")
+
+app = Flask(__name__, static_folder=SITE_DIR, static_url_path="")
 # 他の端末（スマホなど）からのWebアクセスを許可する設定
 CORS(app)
 
-# カエルの状態管理（メモリ上に保持）
-# カエルの状態管理（初期値を直接変更）
-state = {
-    "hunger": 65,  # 初期値を 0 から 65 に変更
-    "level": 2,  # 初期値を 1 から 2 に変更
-    "exp": 12,
-    "next_exp": 20,
-    "stage": "kogaeru",  # 見た目の初期値を変更
+
+# --------------------------------------------------
+# Web画面配信：site_flog/index.html をルートで返す
+# （images/等の静的ファイルは static_folder 設定により自動で配信される）
+# --------------------------------------------------
+@app.route("/")
+def index():
+    return send_from_directory(SITE_DIR, "index.html")
+
+
+# 【8/2追加】リハーサル・本番直前に何度でもゼロから始め直せるように、
+# 初期値は必ずゼロにしておく（以前はテスト用の数値が入ったままで、
+# 本番でうっかりそのまま起動するとレベルが最初から上がった状態になっていた）。
+DEFAULT_STATE = {
+    "hunger": 0,
+    "level": 1,
+    "exp": 0,
+    "next_exp": 10,
+    "stage": "otamajakushi",
     "counts": {
-        "petbottle": 5,  # テスト用に初期値を設定
-        "can": 3,
-        "burnable": 4,  # 🔥 燃えるゴミの初期値を変更
+        "petbottle": 0,
+        "can": 0,
+        "burnable": 0,
     },
 }
+
+# カエルの状態管理（メモリ上に保持）
+state = dict(DEFAULT_STATE)
+state["counts"] = dict(DEFAULT_STATE["counts"])
 
 
 def update_level_and_stage():
@@ -52,7 +76,7 @@ def get_status():
 
 
 # --------------------------------------------------
-# API 2: ごみ投入記録 (2年生Aの推論スクリプトが使用)
+# API 2: ごみ投入記録 (2年生Aの推論スクリプト／sensor_bridge.pyが使用)
 # --------------------------------------------------
 @app.route("/api/feed", methods=["POST"])
 def feed():
@@ -81,8 +105,34 @@ def feed():
 
 
 # --------------------------------------------------
+# API 3【8/2追加】: 状態リセット（リハーサル・本番直前に叩く用）
+# 例:  curl -X POST http://localhost:5000/api/reset
+#      （PowerShellなら curl.exe でもOK。ブラウザで直接は叩けないのでcurl/Postman推奨）
+# --------------------------------------------------
+@app.route("/api/reset", methods=["POST"])
+def reset():
+    state["hunger"] = DEFAULT_STATE["hunger"]
+    state["level"] = DEFAULT_STATE["level"]
+    state["exp"] = DEFAULT_STATE["exp"]
+    state["next_exp"] = DEFAULT_STATE["next_exp"]
+    state["stage"] = DEFAULT_STATE["stage"]
+    state["counts"] = dict(DEFAULT_STATE["counts"])
+    print("[API Reset] 状態をリセットしました。")
+    return jsonify({"success": True, "state": state})
+
+
+# --------------------------------------------------
 # サーバー起動設定
 # --------------------------------------------------
 if __name__ == "__main__":
     # host="0.0.0.0" にすることで外部（スマホや別PC）からのアクセスを許可する
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    #
+    # 【8/2追記】threaded=True を追加：Flask開発用サーバーはデフォルトだと
+    # 一度に1リクエストしか処理できず、仮想マシン経由の2段中継（tcp_relay.py＋SSH
+    # トンネル）でレイテンシが増える構成だと、HTML/CSS/JS/画像/APIなど複数リクエストが
+    # ほぼ同時に来た際に処理待ちで詰まり「読み込み中のまま開けない」症状が出ていた。
+    # あわせて本番デモ中はファイル変更監視で勝手に再起動するリローダー（debug=Trueの
+    # 副作用）も余計な不安定要素になるためオフにする。
+    # 開発中にデバッグ画面が欲しい場合は一時的にdebug=Trueに戻してもよいが、
+    # 本番前には必ずFalseに戻すこと。
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

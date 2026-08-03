@@ -1,793 +1,528 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>ケロッと！はらぺこエコガエル</title>
-
 <style>
-
-*{
-    box-sizing:border-box;
-}
-
-html,body{
-
-    margin:0;
-    padding:0;
-
-    width:100%;
-    height:100%;
-
-    overflow:hidden;
-
-    font-family:
-    "Arial Rounded MT Bold",
-    "Hiragino Maru Gothic Pro",
-    sans-serif;
-
-    background:#d9f7d9;
-
-}
-
-
-#app{
-
-    height:100dvh;
-
-    display:flex;
-
-    flex-direction:column;
-
-}
-
-
-/* メイン */
-
-.main{
-
-    flex:1;
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-    flex-direction:column;
-
-    overflow:hidden;
-
-}
-
-
-/* ページ */
-
-.page{
-
-    display:none;
-
-    width:100%;
-
-    height:100%;
-
-    flex-direction:column;
-
-    align-items:center;
-
-    justify-content:space-evenly;
-
-    text-align:center;
-
-    overflow:hidden;
-
-}
-
-
-.active{
-
-    display:flex;
-
-}
-
-
-
-/* タイトル */
-
-h1{
-
-    font-size:32px;
-
-    color:#38a852;
-
-}
-
-
-h2{
-
-    font-size:45px;
-
-    color:#2e7d32;
-
-}
-
-
-
-.home-frog{
-
-    width:150px;
-
-    height:150px;
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-}
-
-
-.home-frog img{
-
-    width:120%;
-
-    height:120%;
-
-    object-fit:contain;
-
-}
-
-
-
-/* ゴミ数 */
-
-.number{
-
-    font-size:110px;
-
-    font-weight:bold;
-
-    color:#38a852;
-
-}
-
-
-.unit{
-
-    font-size:40px;
-
-}
-
-
-.count-area{
-
-    display:flex;
-
-    align-items:baseline;
-
-    gap:10px;
-
-}
-
-
-
-/* 共通カエル */
-
-.frog{
-
-    width:150px;
-
-    height:150px;
-
-    display:flex;
-
-    justify-content:center;
-
-    align-items:center;
-
-    text-align:center;
-
-    margin:0 auto;
-
-    font-size:120px;
-
-}
-
-
-
-/* 満腹度 */
-
-.gauge{
-
-    width:85%;
-
-    height:40px;
-
-    background:#ddd;
-
-    border-radius:30px;
-
-    overflow:hidden;
-
-}
-
-
-.gauge-inner{
-
-    height:100%;
-
-    width:0%;
-
-    background:#7bdc4c;
-
-    transition:0.5s;
-
-}
-
-
-.status-text{
-
-    font-size:30px;
-
-}
-
-
-.level{
-
-    font-size:35px;
-
-}
-
-
-
-/* 画像サイズ */
-
-h2 img{
-
-    width:100px;
-
-    height:100px;
-
-    object-fit:contain;
-
-}
-
-
-
-/* ナビ */
-
-.nav{
-
-    height:100px;
-
-    background:white;
-
-    display:flex;
-
-    border-top:2px solid #b7eeb7;
-
-}
-
-
-.nav button{
-
-    flex:1;
-
-    border:none;
-
-    background:white;
-
-    color:#2e7d32;
-
-    font-size:22px;
-
-    display:flex;
-
-    flex-direction:column;
-
-    justify-content:center;
-
-    align-items:center;
-
-}
-
-
-.nav button.active-tab{
-
-    background:#b7eeb7;
-
-    font-weight:bold;
-
-}
-
-
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; min-height: 100%;
+    font-family: "Hiragino Maru Gothic Pro", "UD デジタル 教科書体 N-R", "BIZ UDPGothic",
+                 "Yu Gothic", "Meiryo", sans-serif;
+    background: radial-gradient(circle at 50% 0%, #eafff2 0%, #cdf3dd 45%, #a9e6c6 100%);
+    overflow-x: hidden;
+    color: #2f5d46;
+  }
+
+  /* ------- ふわふわ背景の泡 ------- */
+  .bg-bubble {
+    position: fixed; bottom: -60px; border-radius: 50%;
+    background: rgba(255,255,255,0.45);
+    animation: floatUp linear infinite;
+    pointer-events: none; z-index: 0;
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(0) translateX(0); opacity: 0; }
+    10%  { opacity: 0.8; }
+    100% { transform: translateY(-110vh) translateX(20px); opacity: 0; }
+  }
+
+  #app {
+    position: relative; z-index: 1;
+    max-width: 460px; margin: 0 auto;
+    padding: 18px 16px 40px;
+    min-height: 100dvh;
+  }
+
+  /* ------- ヘッダー ------- */
+  .header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-wrap: nowrap; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .title {
+    font-size: 17px; font-weight: 800; color: #2b6b4a;
+    text-shadow: 0 2px 0 #ffffffaa;
+    display: flex; align-items: baseline; gap: 5px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex: 1 1 auto; min-width: 0;
+  }
+  .title .sub {
+    font-size: 11px; font-weight: 700; color: #4c7a63;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .status-pill {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; font-weight: 700;
+    background: #ffffffcc; border-radius: 999px;
+    padding: 5px 9px 5px 7px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: color .3s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #9aa4a0; transition: background .3s;
+  }
+  .status-pill.online .dot { background: #3ecf7e; box-shadow: 0 0 0 0 rgba(62,207,126,.5); animation: pulse 1.6s infinite; }
+  .status-pill.online { color: #227a4c; }
+  .status-pill.connecting .dot { background: #f0b429; animation: blink 1s infinite; }
+  .status-pill.connecting { color: #9a6b0a; }
+  .status-pill.offline .dot { background: #ef5b5b; }
+  .status-pill.offline { color: #b23b3b; }
+  @keyframes pulse {
+    0%   { box-shadow: 0 0 0 0 rgba(62,207,126,.55); }
+    70%  { box-shadow: 0 0 0 7px rgba(62,207,126,0); }
+    100% { box-shadow: 0 0 0 0 rgba(62,207,126,0); }
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+  /* ------- メインカード ------- */
+  .card {
+    background: #ffffffee;
+    border-radius: 28px;
+    box-shadow: 0 10px 30px rgba(30,90,60,0.14), 0 2px 6px rgba(30,90,60,0.08);
+    padding: 22px 20px 20px;
+    margin-top: 14px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.6), rgba(255,255,255,0) 40%);
+    pointer-events: none;
+  }
+
+  .pond {
+    position: relative;
+    display: flex; justify-content: center; align-items: flex-end;
+    height: 190px;
+    margin-bottom: 6px;
+  }
+  .pond-water {
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 210px; height: 46px; border-radius: 50%;
+    background: radial-gradient(ellipse at center, #bfe9d6 0%, #9fdcc0 70%, transparent 100%);
+    filter: blur(1px);
+    animation: ripple 3s ease-in-out infinite;
+  }
+  @keyframes ripple {
+    0%,100% { transform: translateX(-50%) scaleX(1); }
+    50%     { transform: translateX(-50%) scaleX(1.06); }
+  }
+
+  .frog-wrap { position: relative; z-index: 2; animation: hop 2.6s ease-in-out infinite; }
+  @keyframes hop {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    45%      { transform: translateY(-10px) rotate(-2deg); }
+    55%      { transform: translateY(-10px) rotate(2deg); }
+    75%      { transform: translateY(0) rotate(0deg); }
+  }
+  .frog-wrap.leveling { animation: hop 2.6s ease-in-out infinite, spinPop .7s ease-out; }
+  @keyframes spinPop {
+    0%   { transform: scale(1) rotate(0deg); }
+    35%  { transform: scale(1.35) rotate(15deg); }
+    65%  { transform: scale(1.15) rotate(-10deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  .stage-badge {
+    position: absolute; top: -6px; right: calc(50% - 108px);
+    background: #ffd873; color: #7a4b00; font-weight: 800; font-size: 11px;
+    padding: 4px 10px; border-radius: 999px; box-shadow: 0 3px 8px rgba(0,0,0,.12);
+    z-index: 3;
+  }
+
+  /* ------- ステータス列 ------- */
+  .stat-row { display:flex; align-items:baseline; justify-content:center; gap:8px; margin: 4px 0 14px; }
+  .lv-chip {
+    background:#2f8f5d; color:#fff; font-weight:800; font-size:13px;
+    padding:3px 12px; border-radius:999px; box-shadow:0 2px 6px rgba(0,0,0,.12);
+  }
+  .stage-name { font-size:14px; font-weight:700; color:#3a6f55; }
+
+  .gauge-block { margin: 10px 4px 4px; }
+  .gauge-label { display:flex; justify-content:space-between; font-size:12px; font-weight:700; color:#4c7a63; margin-bottom:5px; }
+  .gauge-track {
+    position: relative; height: 22px; border-radius: 999px;
+    background: #e7f4ec; box-shadow: inset 0 2px 4px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .gauge-fill {
+    position: absolute; inset: 0; width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ffd35c, #ff9a5c 60%, #ff6f6f);
+    transition: width 0.8s cubic-bezier(.2,.9,.3,1.2);
+  }
+  .gauge-fill::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.55) 45%, transparent 60%);
+    background-size: 220% 100%;
+    animation: shine 2.4s linear infinite;
+  }
+  @keyframes shine {
+    0%   { background-position: 120% 0; }
+    100% { background-position: -20% 0; }
+  }
+  .gauge-fill.exp { background: linear-gradient(90deg, #7fe0c9, #58c6ec); }
+
+  /* ------- カウントカード ------- */
+  .counts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+  .count-card {
+    background: #f4fbf6; border-radius: 18px; padding: 12px 6px 10px;
+    text-align: center; position: relative;
+    box-shadow: 0 3px 10px rgba(30,90,60,0.07);
+    transition: transform .25s;
+  }
+  .count-card .icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    object-fit: cover; display: block; margin: 0 auto 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.12);
+    border: 2px solid #ffffff;
+  }
+  .count-card .num { font-size: 20px; font-weight: 800; color: #2b6b4a; }
+  .count-card .label { font-size: 10px; color: #6f9483; margin-top: 2px; font-weight: 600; }
+  .count-card.bump { animation: bump .5s ease; }
+  @keyframes bump {
+    0%   { transform: scale(1); }
+    35%  { transform: scale(1.18); }
+    100% { transform: scale(1); }
+  }
+  .plus-float {
+    position: absolute; top: -6px; left: 50%; transform: translateX(-50%);
+    font-size: 13px; font-weight: 800; color: #ff8a3d;
+    animation: floatPlus 1s ease-out forwards;
+    pointer-events: none;
+  }
+  @keyframes floatPlus {
+    0%   { opacity: 0; transform: translate(-50%, 4px); }
+    25%  { opacity: 1; }
+    100% { opacity: 0; transform: translate(-50%, -26px); }
+  }
+
+  .footer-note {
+    text-align: center; font-size: 11px; color: #6f9483; margin-top: 16px;
+    opacity: .85;
+  }
+
+  /* ------- レベルアップ演出 ------- */
+  #toast {
+    position: fixed; left: 50%; top: 18px; transform: translate(-50%, -140%);
+    background: #2b6b4a; color: #fff; font-weight: 800; font-size: 14px;
+    padding: 10px 20px; border-radius: 999px; box-shadow: 0 8px 20px rgba(0,0,0,.2);
+    z-index: 20; transition: transform .45s cubic-bezier(.2,.9,.3,1.3);
+    white-space: nowrap;
+  }
+  #toast.show { transform: translate(-50%, 0); }
+
+  .confetti {
+    position: fixed; top: 40%; left: 50%; width: 8px; height: 8px;
+    border-radius: 2px; z-index: 15; pointer-events: none;
+  }
+
+  /* ------- オフライン時のふわっと表示 ------- */
+  .offline-banner {
+    display: none;
+    text-align: center; font-size: 12px; font-weight: 700;
+    background: #fff3e0; color: #a15c00; border-radius: 14px;
+    padding: 8px 12px; margin-top: 10px;
+  }
+  .offline-banner.show { display: block; }
 </style>
-
 </head>
-
-
 <body>
-
 
 <div id="app">
 
+  <div class="header">
+    <div class="title">🐸 ケロッと！<span class="sub">はらぺこエコガエル</span></div>
+    <div class="status-pill connecting" id="statusPill">
+      <span class="dot"></span><span id="statusText">接続中</span>
+    </div>
+  </div>
 
-<div class="main">
+  <div class="card">
 
+    <div class="pond">
+      <div class="pond-water"></div>
+      <div class="frog-wrap" id="frogWrap">
+        <div class="stage-badge" id="stageBadge">オタマジャクシ</div>
+        <!-- オタマジャクシ：黒くてにょろにょろの尻尾＋ひれ -->
+        <svg id="frog-otamajakushi" class="frog-svg" width="150" height="140" viewBox="0 0 170 140" style="display:none">
+          <!-- ひれ（半透明）尻尾に沿ってふわっと -->
+          <path d="M92 66 C 112 40, 128 78, 148 52 C 160 38, 168 58, 158 70
+                   C 150 80, 140 66, 128 78 C 118 88, 108 74, 92 82 Z"
+                fill="#bfe3ee" opacity="0.55"/>
+          <!-- 尻尾（にょろにょろ・黒） -->
+          <path d="M90 68 C 110 52, 122 84, 142 62 C 152 51, 162 66, 155 76
+                   C 145 88, 132 70, 118 82 C 108 90, 98 78, 90 82 Z"
+                fill="#26272a"/>
+          <!-- 体（丸くてかわいい黒いからだ） -->
+          <ellipse cx="58" cy="72" rx="46" ry="40" fill="#2c2d30"/>
+          <ellipse cx="42" cy="56" rx="14" ry="10" fill="#3a3b3f" opacity="0.6"/>
+          <!-- 目（上のほうについてるオタマジャクシらしい目） -->
+          <circle cx="45" cy="54" r="10" fill="#fdfdfd"/>
+          <circle cx="72" cy="54" r="10" fill="#fdfdfd"/>
+          <circle cx="47" cy="56" r="5.6" fill="#1c1c1c"/>
+          <circle cx="74" cy="56" r="5.6" fill="#1c1c1c"/>
+          <circle cx="49.5" cy="53.5" r="1.9" fill="#fff"/>
+          <circle cx="76.5" cy="53.5" r="1.9" fill="#fff"/>
+          <!-- ほっぺ -->
+          <ellipse cx="32" cy="76" rx="7" ry="4.6" fill="#ffb6c1" opacity="0.75"/>
+          <ellipse cx="86" cy="76" rx="7" ry="4.6" fill="#ffb6c1" opacity="0.75"/>
+          <!-- にっこり口 -->
+          <path d="M48 86 Q59 93 70 86" stroke="#0f0f10" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        </svg>
+        <!-- 子ガエル -->
+        <svg id="frog-kogaeru" class="frog-svg" width="140" height="140" viewBox="0 0 140 140" style="display:none">
+          <ellipse cx="70" cy="95" rx="42" ry="30" fill="#5fc98a"/>
+          <ellipse cx="40" cy="100" rx="13" ry="16" fill="#5fc98a"/>
+          <ellipse cx="100" cy="100" rx="13" ry="16" fill="#5fc98a"/>
+          <circle cx="48" cy="55" r="17" fill="#5fc98a"/>
+          <circle cx="92" cy="55" r="17" fill="#5fc98a"/>
+          <circle cx="48" cy="55" r="9" fill="#2f5d46"/>
+          <circle cx="92" cy="55" r="9" fill="#2f5d46"/>
+          <circle cx="51" cy="52" r="3" fill="#fff"/>
+          <circle cx="95" cy="52" r="3" fill="#fff"/>
+          <path d="M50 92 Q70 106 90 92" stroke="#2f5d46" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+          <ellipse cx="34" cy="88" rx="7" ry="5" fill="#ffb6c1" opacity="0.75"/>
+          <ellipse cx="106" cy="88" rx="7" ry="5" fill="#ffb6c1" opacity="0.75"/>
+        </svg>
+        <!-- 満腹ガエル -->
+        <svg id="frog-manpuku" class="frog-svg" width="150" height="150" viewBox="0 0 150 150" style="display:none">
+          <ellipse cx="75" cy="98" rx="50" ry="36" fill="#3fbf78"/>
+          <ellipse cx="38" cy="104" rx="15" ry="18" fill="#3fbf78"/>
+          <ellipse cx="112" cy="104" rx="15" ry="18" fill="#3fbf78"/>
+          <circle cx="50" cy="52" r="20" fill="#3fbf78"/>
+          <circle cx="100" cy="52" r="20" fill="#3fbf78"/>
+          <circle cx="50" cy="52" r="10.5" fill="#2f5d46"/>
+          <circle cx="100" cy="52" r="10.5" fill="#2f5d46"/>
+          <circle cx="53.5" cy="48" r="3.4" fill="#fff"/>
+          <circle cx="103.5" cy="48" r="3.4" fill="#fff"/>
+          <path d="M48 96 Q75 116 102 96" stroke="#2f5d46" stroke-width="4" fill="none" stroke-linecap="round"/>
+          <ellipse cx="30" cy="92" rx="8" ry="6" fill="#ffb6c1" opacity="0.8"/>
+          <ellipse cx="120" cy="92" rx="8" ry="6" fill="#ffb6c1" opacity="0.8"/>
+          <!-- 王冠（しっかり冠の形） -->
+          <g>
+            <path d="M53 34 L53 15 L63 26 L75 6 L87 26 L97 15 L97 34 Z"
+                  fill="#ffd35c" stroke="#d9971f" stroke-width="2" stroke-linejoin="round"/>
+            <rect x="51" y="30" width="48" height="9" rx="3" fill="#ffcf49" stroke="#d9971f" stroke-width="2"/>
+            <circle cx="53" cy="15" r="3.4" fill="#fff3c4" stroke="#d9971f" stroke-width="1.4"/>
+            <circle cx="75" cy="6" r="4" fill="#ff8fa3" stroke="#d9971f" stroke-width="1.4"/>
+            <circle cx="97" cy="15" r="3.4" fill="#fff3c4" stroke="#d9971f" stroke-width="1.4"/>
+            <circle cx="75" cy="34.5" r="2.6" fill="#4fc3f7" stroke="#d9971f" stroke-width="1"/>
+          </g>
+        </svg>
+      </div>
+    </div>
 
+    <div class="stat-row">
+      <span class="lv-chip">Lv. <span id="levelNum">1</span></span>
+      <span class="stage-name" id="stageName">オタマジャクシ</span>
+    </div>
 
-<!-- ホーム -->
+    <div class="gauge-block">
+      <div class="gauge-label"><span>満腹度 まんぷくど</span><span id="hungerPct">0%</span></div>
+      <div class="gauge-track"><div class="gauge-fill" id="hungerFill"></div></div>
+    </div>
 
-<div id="home" class="page active">
+    <div class="gauge-block">
+      <div class="gauge-label"><span>つぎのレベルまで</span><span id="expText">0 / 10</span></div>
+      <div class="gauge-track"><div class="gauge-fill exp" id="expFill"></div></div>
+    </div>
 
+    <div class="counts">
+      <div class="count-card" id="card-petbottle">
+        <img class="icon" src="images/petbottle.jpg" alt="ペットボトル" onerror="this.style.display='none'; this.nextElementSibling.insertAdjacentHTML('afterbegin','🥤');">
+        <div class="num" id="num-petbottle">0</div>
+        <div class="label">ペットボトル</div>
+      </div>
+      <div class="count-card" id="card-can">
+        <img class="icon" src="images/can.jpg" alt="缶" onerror="this.style.display='none'; this.nextElementSibling.insertAdjacentHTML('afterbegin','🥫');">
+        <div class="num" id="num-can">0</div>
+        <div class="label">缶</div>
+      </div>
+      <div class="count-card" id="card-burnable">
+        <img class="icon" src="images/burnable.jpg" alt="燃えるゴミ" onerror="this.style.display='none'; this.nextElementSibling.insertAdjacentHTML('afterbegin','🔥');">
+        <div class="num" id="num-burnable">0</div>
+        <div class="label">燃えるゴミ</div>
+      </div>
+    </div>
 
-<h1>
-🐸 ホーム
-</h1>
+    <div class="offline-banner" id="offlineBanner">
+      🐸 …ぷくぷく（サーバーに繋がらないケロ。自動で再接続をがんばってます）
+    </div>
 
+  </div>
 
-<div class="home-frog">
-
-<img src="images/frog.png">
-
+  <div class="footer-note">かざしたゴミの分だけ、カエルが育つよ 🌱</div>
 </div>
 
+<div id="toast"></div>
 
-<div class="level">
-
-レベル：
-<span id="level">
-1
-</span>
-
-</div>
-
-
-</div>
-
-
-
-
-
-<!-- 缶 -->
-
-<div id="canPage" class="page">
-
-
-<h2>
-
-<img src="images/kann2.png">
-
-</h2>
-
-
-<div class="count-area">
-
-
-<div class="number" id="can">
-0
-</div>
-
-
-<div class="unit">
-個
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-<!-- 燃えるゴミ -->
-
-<div id="bottlePage" class="page">
-
-
-<h2>
-
-<img src="images/moerugomi2.png">
-
-</h2>
-
-
-<div class="count-area">
-
-
-<div class="number" id="burnable">
-0
-</div>
-
-
-<div class="unit">
-個
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-
-
-
-<!-- ペットボトル -->
-
-<div id="petPage" class="page">
-
-
-<h2>
-
-<img src="images/pettobotoru2.png">
-
-</h2>
-
-
-<div class="count-area">
-
-
-<div class="number" id="petbottle">
-0
-</div>
-
-
-<div class="unit">
-個
-</div>
-
-
-</div>
-
-
-</div>
-
-
-
-</div>
-
-
-
-
-
-<!-- 共通部分 -->
-
-<div class="common-status">
-
-
-<div class="frog">
-
-🐸
-
-</div>
-
-
-<div class="gauge">
-
-<div id="gauge" class="gauge-inner">
-
-</div>
-
-</div>
-
-
-<div class="status-text">
-
-満腹度：
-<span id="hunger">
-0
-</span>
-%
-
-</div>
-
-
-</div>
-
-
-
-
-
-<!-- ナビ -->
-
-<div class="nav">
-
-
-<button onclick="changePage('home',this)"
-class="active-tab">
-
-🏠
-<br>
-ホーム
-
-</button>
-
-
-<button onclick="changePage('canPage',this)">
-
-🥫
-<br>
-缶
-
-</button>
-
-
-<button onclick="changePage('bottlePage',this)">
-
-🔥
-<br>
-燃える
-
-</button>
-
-
-<button onclick="changePage('petPage',this)">
-
-🧴
-<br>
-ペット
-
-</button>
-
-
-</div>
-
-
-</div>
 <script>
-
-
-const API_URL =
-"http://172.20.124.38:5000/api/status";
-
-
-
-
-// ページ切替
-
-function changePage(id,button){
-
-
-document.querySelectorAll(".page")
-.forEach(page=>{
-
-    page.classList.remove("active");
-
-});
-
-
-document.getElementById(id)
-.classList.add("active");
-
-
-
-document.querySelectorAll(".nav button")
-.forEach(btn=>{
-
-    btn.classList.remove("active-tab");
-
-});
-
-
-button.classList.add("active-tab");
-
-
-}
-
-
-
-
-
-
-// 画面更新
-
-function updateScreen(data){
-
-
-
-document.getElementById("can")
-.innerHTML =
-data.counts.can;
-
-
-
-document.getElementById("burnable")
-.innerHTML =
-data.counts.burnable;
-
-
-
-document.getElementById("petbottle")
-.innerHTML =
-data.counts.petbottle;
-
-
-
-
-
-// ゴミ10個で満腹100%
-
-let total =
-
-data.counts.can +
-
-data.counts.burnable +
-
-data.counts.petbottle;
-
-
-
-let hunger =
-
-total * 10;
-
-
-
-if(hunger > 100){
-
-    hunger = 100;
-
-}
-
-
-
-
-document.getElementById("hunger")
-.innerHTML =
-hunger;
-
-
-
-document.getElementById("gauge")
-.style.width =
-hunger + "%";
-
-
-
-
-
-document.getElementById("level")
-.innerHTML =
-data.level;
-
-
-
-}
-
-
-
-
-
-
-// ダミーデータ
-
-function getDummyData(){
-
-
-return{
-
-
-counts:{
-
-
-can:5,
-
-
-burnable:3,
-
-
-petbottle:8
-
-
-},
-
-
-level:2
-
-
-
-};
-
-
-}
-
-
-
-
-
-
-
-// Flask取得
-
-async function getStatus(){
-
-
-try{
-
-
-const response =
-
-await fetch(API_URL);
-
-
-
-if(!response.ok){
-
-    throw Error();
-
-}
-
-
-
-const data =
-
-await response.json();
-
-
-
-updateScreen(data);
-
-
-
-}
-
-catch(error){
-
-
-console.log(
-
-"Flask未接続 → ダミー表示"
-
-);
-
-
-
-updateScreen(
-
-getDummyData()
-
-);
-
-
-
-}
-
-
-}
-
-
-
-
-
-
-getStatus();
-
-
-
-setInterval(
-
-getStatus,
-
-300
-
-);
-
-
-
+(function () {
+  "use strict";
+
+  var STAGE_META = {
+    otamajakushi: { label: "オタマジャクシ", svg: "frog-otamajakushi" },
+    kogaeru:      { label: "子ガエル",       svg: "frog-kogaeru" },
+    manpuku:      { label: "満腹ガエル",     svg: "frog-manpuku" }
+  };
+
+  var prev = null; // 直前のstateを保持して差分検知に使う
+  var failCount = 0;
+  var pollTimer = null;
+  var POLL_INTERVAL_OK = 2500;
+  var POLL_INTERVAL_BACKOFF_MAX = 15000;
+
+  function $(id) { return document.getElementById(id); }
+
+  function setStatus(mode) {
+    var pill = $("statusPill");
+    pill.className = "status-pill " + mode;
+    $("statusText").textContent =
+      mode === "online" ? "オンライン" :
+      mode === "offline" ? "オフライン" : "接続中";
+    $("offlineBanner").classList.toggle("show", mode === "offline");
+  }
+
+  function showToast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 2200);
+  }
+
+  function burstConfetti() {
+    var colors = ["#ffd35c", "#ff9a5c", "#7fe0c9", "#58c6ec", "#ff8fb1"];
+    for (var i = 0; i < 26; i++) {
+      var el = document.createElement("div");
+      el.className = "confetti";
+      el.style.background = colors[i % colors.length];
+      el.style.left = (50 + (Math.random() * 40 - 20)) + "%";
+      el.style.top = "35%";
+      document.body.appendChild(el);
+      var dx = (Math.random() * 240 - 120);
+      var dy = -(Math.random() * 180 + 60);
+      var rot = Math.random() * 480 - 240;
+      var anim = el.animate([
+        { transform: "translate(0,0) rotate(0deg)", opacity: 1 },
+        { transform: "translate(" + dx + "px," + (dy) + "px) rotate(" + rot + "deg)", opacity: 1, offset: 0.6 },
+        { transform: "translate(" + (dx * 1.15) + "px," + (dy + 220) + "px) rotate(" + (rot * 1.4) + "deg)", opacity: 0 }
+      ], { duration: 1100 + Math.random() * 500, easing: "cubic-bezier(.2,.7,.3,1)" });
+      anim.onfinish = function (node) { return function () { node.remove(); }; }(el);
+    }
+  }
+
+  function bumpCard(type) {
+    var card = $("card-" + type);
+    if (!card) return;
+    card.classList.remove("bump");
+    void card.offsetWidth; // reflow でアニメ再トリガー
+    card.classList.add("bump");
+    var plus = document.createElement("div");
+    plus.className = "plus-float";
+    plus.textContent = "+1";
+    card.appendChild(plus);
+    setTimeout(function () { plus.remove(); }, 1000);
+  }
+
+  function applyState(data) {
+    var stageInfo = STAGE_META[data.stage] || STAGE_META.otamajakushi;
+
+    // カエルの見た目切り替え
+    document.querySelectorAll(".frog-svg").forEach(function (svg) { svg.style.display = "none"; });
+    var svgEl = $(stageInfo.svg);
+    if (svgEl) svgEl.style.display = "block";
+    $("stageBadge").textContent = stageInfo.label;
+    $("stageName").textContent = stageInfo.label;
+    $("levelNum").textContent = data.level;
+
+    var hunger = Math.max(0, Math.min(100, data.hunger || 0));
+    $("hungerFill").style.width = hunger + "%";
+    $("hungerPct").textContent = hunger + "%";
+
+    var exp = data.exp || 0, nextExp = data.next_exp || 1;
+    var expPct = Math.max(0, Math.min(100, (exp / nextExp) * 100));
+    $("expFill").style.width = expPct + "%";
+    $("expText").textContent = exp + " / " + nextExp;
+
+    var counts = data.counts || {};
+    ["petbottle", "can", "burnable"].forEach(function (type) {
+      var val = counts[type] || 0;
+      var numEl = $("num-" + type);
+      if (numEl) numEl.textContent = val;
+    });
+
+    // ---- 差分検知：カウント増加・レベルアップ演出 ----
+    if (prev) {
+      ["petbottle", "can", "burnable"].forEach(function (type) {
+        var before = (prev.counts || {})[type] || 0;
+        var after = counts[type] || 0;
+        if (after > before) bumpCard(type);
+      });
+      if ((data.level || 0) > (prev.level || 0)) {
+        $("frogWrap").classList.remove("leveling");
+        void $("frogWrap").offsetWidth;
+        $("frogWrap").classList.add("leveling");
+        showToast("🎉 レベルアップ！ " + stageInfo.label + " になったケロ！");
+        burstConfetti();
+      }
+    }
+    prev = data;
+  }
+
+  function scheduleNext(delay) {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(poll, delay);
+  }
+
+  function poll() {
+    var ctrl = ("AbortController" in window) ? new AbortController() : null;
+    var timeoutId = ctrl ? setTimeout(function () { ctrl.abort(); }, 4000) : null;
+
+    fetch("/api/status", ctrl ? { signal: ctrl.signal, cache: "no-store" } : { cache: "no-store" })
+      .then(function (res) {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (data) {
+        failCount = 0;
+        setStatus("online");
+        applyState(data);
+        scheduleNext(POLL_INTERVAL_OK);
+      })
+      .catch(function () {
+        if (timeoutId) clearTimeout(timeoutId);
+        failCount++;
+        setStatus(failCount >= 2 ? "offline" : "connecting");
+        var backoff = Math.min(POLL_INTERVAL_BACKOFF_MAX, POLL_INTERVAL_OK * Math.pow(1.6, failCount));
+        scheduleNext(backoff);
+      });
+  }
+
+  // 背景の泡を軽く生成（軽量・純CSS/JSのみ）
+  function spawnBubbles() {
+    for (var i = 0; i < 10; i++) {
+      var b = document.createElement("div");
+      b.className = "bg-bubble";
+      var size = 10 + Math.random() * 26;
+      b.style.width = size + "px";
+      b.style.height = size + "px";
+      b.style.left = (Math.random() * 100) + "%";
+      b.style.animationDuration = (9 + Math.random() * 9) + "s";
+      b.style.animationDelay = (Math.random() * 10) + "s";
+      document.body.appendChild(b);
+    }
+  }
+
+  spawnBubbles();
+  poll();
+})();
 </script>
 
-
 </body>
-
 </html>

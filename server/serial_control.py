@@ -3,7 +3,11 @@ import serial
 
 # --- 設定項目 ---
 # 環境に合わせてCOMポートを変更してください
-PORT = "COM4"
+# 【構成メモ】このArduino（servo_3.ino書き込み・フタ開閉用）と、
+# server/sensor_bridge.py が読む別のArduino（GarbageCounter.ino書き込み・
+# フォトインタラプタのカウント用）は物理的に別ポートになる。両方使う場合は
+# デバイスマネージャーでどちらがどのCOM番号か必ず確認すること。
+PORT = "COM7"  # 【8/2更新】デバイスマネージャーで実機確認：COM7=サーボ制御用Arduino
 BAUD_RATE = 9600
 
 # シリアル通信オブジェクト（グローバル変数として保持）
@@ -82,12 +86,16 @@ if __name__ == "__main__":
     # 口1（ペットボトル）を開けるテスト
     print("\n--- テスト1: 口1 (ペットボトル) 送信 ---")
     open_lid(1)  # 数値の 1 でも OK
-    time.sleep(3)
+    time.sleep(5)
 
     # 口2（缶）を開けるテスト
     print("\n--- テスト2: 口2 (缶) 送信 ---")
     open_lid("2")  # 文字列の "2" でも OK
-    time.sleep(3)
+    time.sleep(5)
+
+    print("\n--- テスト2: 口3 (燃えるゴミ) 送信 ---")
+    open_lid("3")  # 文字列の "2" でも OK
+    time.sleep(5)
 
     # 口0（リセット・全閉）のテスト
     print("\n--- テスト3: 口0 (全閉) 送信 ---")

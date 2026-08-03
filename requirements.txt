@@ -1,0 +1,33 @@
+# ケロッと！はらぺこエコガエル - Python依存パッケージ一括インストール用
+#
+# 本番はこのPC1台に集約する構成なので、以下を全部同じPC（同じPython環境）に
+# インストールすればOKです。
+#
+# 使い方：
+#   pip install -r requirements.txt
+#
+# torch はサイズが大きいので、時間が無い場合はCPU版で十分です
+# （画像分類モデルの推論だけなのでGPUは必須ではありません）。
+
+# --- ai_core/State machine.py（RealSense + AI推論） ---
+pyrealsense2
+opencv-python
+transformers
+torch
+pillow
+numpy
+mediapipe
+
+# --- server/app.py（Flask APIサーバー + Web画面配信） ---
+flask
+flask-cors
+
+# --- server/serial_control.py / server/sensor_bridge.py（シリアル通信） ---
+pyserial
+
+# --- 共通（Flask連携・VOICEVOX連携で使用） ---
+requests
+
+# --- network_relay/start_cloudflare_tunnel.py（Plan C・Web公開の保険、任意） ---
+# 無くても動く（QRコード表示だけ省略される）が、入れておくと公開URLをその場でQR化できる。
+qrcode

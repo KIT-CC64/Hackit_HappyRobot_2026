@@ -58,3 +58,9 @@ test_data/
 # ※Teachable Machineのモデルデータ（.h5 や .tflite など）は
 # 軽いのでGitに入れて共有しても良いですが、もし重すぎる場合は除外して
 # Googleドライブ等で共有する運用にしてください。
+
+# MediaPipe Hands（手検出）のモデルファイル（約7.4MB、READMEの手順で各自ダウンロード）
+ai_core/hand_landmarker.task
+
+# VOICEVOX事前キャッシュ（各自のPCでpython voice_control.py --warmupすれば再生成される）
+voice/cache/
