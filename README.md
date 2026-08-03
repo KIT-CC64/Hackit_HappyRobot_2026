@@ -29,7 +29,7 @@ Happy Robot
 
 - スクリーンショット：
 
-  ![完成した分別強制ゴミ箱の実機](docs_images/final.jpg)
+  <img src="docs_images/final.jpg" alt="完成した分別強制ゴミ箱の実機" width="300" height="364">
 
   カエルの口3つ（青＝ペットボトル／黄＝缶／赤＝燃えるゴミ）と、RealSenseカメラ、
   「ここの前に持っているごみをかざしてケロ！」の吹き出しを備えた実機。
